@@ -1,4 +1,6 @@
-// --- KONFIGURÁCIÓ ---
+// =============================================================
+// KONFIGURÁCIÓ
+// =============================================================
 const RA_CARTA = 1.39; 
 const CORES = [
     [35, 85, 172], // Kék
@@ -14,7 +16,9 @@ const CSS_BTN_SZINEK = [
 
 const SZIN_NEVEK = ["Kék", "Piros", "Sárga"];
 
-// --- JÁTÉK ÁLLAPOT ---
+// =============================================================
+// JÁTÉK ÁLLAPOT
+// =============================================================
 let historico = {
     pos: -1,
     dados: []
@@ -23,14 +27,17 @@ let historico = {
 let cartas_descartadas = [];
 let nincsTobbLehetoseg = false;
 
-// --- INDÍTÁS ---
+// =============================================================
+// INDÍTÁS (SETUP)
+// =============================================================
 function setup() {
-    kijelzoLetrehozasa();       
-    tablazatLetrehozasa();      
+    kijelzoLetrehozasa();        
+    tablazatLetrehozasa();       
     sajatPontKalkulatorLetrehozasa(); 
 
     iniciarJogo();
 
+    // Vue kompatibilitás (ha van)
     if (typeof Vue !== 'undefined') {
         window.app = new Vue({
             el: '#app',
@@ -63,7 +70,9 @@ function iniciarJogo() {
     setTimeout(ellenorizdAPontokat, 500);
 }
 
-// --- RAJZOLÁS ---
+// =============================================================
+// RAJZOLÁS (DRAW)
+// =============================================================
 function draw() {
     clear(); 
     if (!width || !height) return;
@@ -93,6 +102,7 @@ function draw() {
             strokeWeight(3);
             text(carta, centroX, centroY);
 
+            // Ha nincs több lehetőség és ez a kártya megmaradt, jelöljük meg
             if (nincsTobbLehetoseg && !cartas_descartadas[cor][carta - 1]) {
                 stroke(255, 0, 0); 
                 strokeWeight(5);
@@ -103,6 +113,9 @@ function draw() {
     }
 }
 
+// =============================================================
+// INTERAKCIÓ (INPUT)
+// =============================================================
 function mousePressed() {
     if (mouseX < 0 || mouseX > width || mouseY < 0 || mouseY > height) return;
 
@@ -125,7 +138,6 @@ function mousePressed() {
     }
 }
 
-// --- KATTINTÁS A GOMBOKON ---
 window.leadKombinaciot = function(tipus, p1, p2, p3, extraInfo) {
     let pont = 0;
     
@@ -155,7 +167,9 @@ window.leadKombinaciot = function(tipus, p1, p2, p3, extraInfo) {
     ellenorizdAPontokat();
 }
 
-// --- LOGIKA ---
+// =============================================================
+// ALAP LOGIKA (HISTORY, DISPONIBILIDADE)
+// =============================================================
 function limpar() {
     historico.pos = 1;
     desfazer();
@@ -191,7 +205,6 @@ function cartaDisponivel(carta, cor) {
     return !cartas_descartadas[cor][carta - 1];
 }
 
-// Ez az "egyszerű" ellenőrzés a rajzoláshoz és a gombokhoz
 function combinacaoDisponivel(a, b, c, cor = -1) {
     let ord = [a, b, c].sort((x, y) => x - y);
     a = ord[0]; b = ord[1]; c = ord[2];
@@ -211,7 +224,218 @@ function combinacaoDisponivel(a, b, c, cor = -1) {
     return false;
 }
 
-// --- KIJELZŐK ---
+// =============================================================
+// ÚJ ALGORITMUS (REKURZIÓ + ÚTVONAL KERESÉS)
+// =============================================================
+function calculateMaxDisjointScore(candidates, usedCardsMap) {
+    if (candidates.length === 0) return { score: 0, moves: [] };
+
+    // Belső rekurzív függvény
+    function solve(index, currentUsed) {
+        // Alapeset: elfogytak a jelöltek
+        if (index >= candidates.length) return { score: 0, moves: [] };
+
+        let move = candidates[index];
+
+        // 1. opció: KIPÖRGETJÜK (NEM választjuk ki ezt a lépést)
+        let resSkip = solve(index + 1, currentUsed);
+
+        // 2. opció: KIVÁLASZTJUK ezt a lépést (ha nem ütközik)
+        let canPick = true;
+        for (let card of move.cards) {
+            let key = card.c + "-" + card.v;
+            if (currentUsed.has(key)) {
+                canPick = false;
+                break;
+            }
+        }
+
+        let resPick = { score: -1, moves: [] };
+
+        if (canPick) {
+            let newUsed = new Set(currentUsed);
+            for (let card of move.cards) {
+                newUsed.add(card.c + "-" + card.v);
+            }
+            
+            let remaining = solve(index + 1, newUsed);
+            
+            // Eredmény összeállítása (pont + lépés lista)
+            resPick = {
+                score: move.points + remaining.score,
+                moves: [move, ...remaining.moves]
+            };
+        }
+
+        // A jobbikat adjuk vissza
+        if (resPick.score > resSkip.score) {
+            return resPick;
+        } else {
+            return resSkip;
+        }
+    }
+
+    return solve(0, new Set());
+}
+
+// =============================================================
+// FŐ ELLENŐRZŐ LOGIKA (UI + KALKULÁCIÓ ÖSSZEKÖTÉSE)
+// =============================================================
+function ellenorizdAPontokat() {
+    let baseBtnStyle = "cursor:pointer; padding:6px 12px; margin:3px; display:inline-block; border-radius:6px; font-weight:bold; border:1px solid rgba(255,255,255,0.3); text-align:center; vertical-align:middle;";
+    let html = "<h4 style='margin:0 0 10px 0; text-align:center; color:white;'>Még kirakható:</h4>";
+
+    let allCandidates = [];
+
+    try {
+        // --- ADATGYŰJTÉS ---
+
+        // 0. Vegyes Sorok
+        let vanVegyes = false;
+        let vegyesHtml = `<div style="border-bottom:1px solid #444; padding-bottom:5px; margin-bottom:5px;"><strong>Vegyes sorok:</strong><br>`;
+        for (let i = 1; i <= 6; i++) {
+             if (combinacaoDisponivel(i, i + 1, i + 2)) {
+                let pont = (i * 10);
+                
+                // Megkeressük az első elérhető kártyákat az optimalizálóhoz
+                let mixedCards = [];
+                let nums = [i, i+1, i+2];
+                for(let n of nums) {
+                    for(let c=0; c<3; c++) {
+                        if(!cartas_descartadas[c][n-1]) {
+                            mixedCards.push({c:c, v:n});
+                            break; // Megvan a szám, ugrás a következő számra
+                        }
+                    }
+                }
+                
+                if(mixedCards.length === 3) {
+                    allCandidates.push({ points: pont, cards: mixedCards, name: `Vegyes ${i}-${i+2}` });
+                }
+
+                vegyesHtml += `<span style='padding:6px 12px; margin:3px; display:inline-block; border-radius:6px; font-weight:bold; border:1px solid transparent; text-align:center; background:#2e5e4e; color:#eee; cursor:default; opacity:0.8;'>
+                                    ${i}-${i+1}-${i+2} <span style="font-size:0.8em; color:#bbb">(${pont}p)</span>
+                                 </span>`;
+                vanVegyes = true;
+            }
+        }
+        vegyesHtml += "</div>";
+        if(vanVegyes) html += vegyesHtml;
+
+        // 1. SZÍNES CSOPORTOK
+        for (let c = 0; c < 3; c++) {
+            let vanEbbenSzinben = false;
+            let szinHtml = `<div style="border-bottom:1px solid #444; padding:5px 0; margin-bottom:5px;">`; 
+            szinHtml += `<strong style="color:${CSS_BTN_SZINEK[c].split(';')[1]}">${SZIN_NEVEK[c]}:</strong><br>`;
+
+            for (let i = 1; i <= 6; i++) {
+                if (combinacaoDisponivel(i, i + 1, i + 2, c)) {
+                    let pont = (i * 10) + 40;
+                    
+                    allCandidates.push({
+                        points: pont,
+                        cards: [{c:c, v:i}, {c:c, v:i+1}, {c:c, v:i+2}],
+                        name: `${SZIN_NEVEK[c]} ${i}-${i+2}`
+                    });
+
+                    szinHtml += `<span style='${baseBtnStyle} ${CSS_BTN_SZINEK[c]}' onclick='leadKombinaciot("szin_sor", ${i}, ${i+1}, ${i+2}, ${c})'>
+                                        ${i}-${i+1}-${i+2} <span style="font-size:0.8em; opacity:0.8">(${pont}p)</span>
+                                     </span>`;
+                    vanEbbenSzinben = true;
+                }
+            }
+            szinHtml += `</div>`;
+            if (vanEbbenSzinben) html += szinHtml;
+        }
+
+        // 2. SZETTEK
+        let vanSzett = false;
+        let szettHtml = `<div style="padding-top:5px;"><strong>Szettek:</strong><br>`;
+        for (let i = 1; i <= 8; i++) {
+            if (combinacaoDisponivel(i, i, i)) {
+                let pont = (i * 10) + 10;
+                
+                allCandidates.push({
+                    points: pont,
+                    cards: [{c:0, v:i}, {c:1, v:i}, {c:2, v:i}],
+                    name: `Szett ${i}`
+                });
+
+                szettHtml += `<span style='${baseBtnStyle} background:#555; color:white;' onclick='leadKombinaciot("szett", ${i}, ${i}, ${i})'>
+                            ${i}-${i}-${i} <span style="font-size:0.8em; color:#ddd">(${pont}p)</span>
+                         </span>`;
+                vanSzett = true;
+            }
+        }
+        szettHtml += "</div>";
+        if(vanSzett) html += szettHtml;
+
+        // --- OPTIMALIZÁLÁS FUTTATÁSA ---
+        
+        let resultObj = calculateMaxDisjointScore(allCandidates, new Set());
+        let realMaxPoints = resultObj.score;
+        let bestMoves = resultObj.moves;
+
+        // --- UI FRISSÍTÉS ---
+        let tablazat = document.getElementById("kombinacio-tablazat");
+        if (tablazat) tablazat.innerHTML = html;
+
+        if (allCandidates.length === 0) nincsTobbLehetoseg = true;
+        else nincsTobbLehetoseg = false;
+
+        // --- JOBB FELSŐ KIJELZŐ ---
+        let kijelzo = document.getElementById("pont-kijelzo");
+        let sajatPont = parseInt(document.getElementById("sajat-pont-input").value) || 0;
+        let osszesPotencial = sajatPont + realMaxPoints;
+
+        if (kijelzo) {
+            kijelzo.style.display = "none"; 
+            
+            // Akkor is mutassa, ha van még lehetőség, vagy ha már van pontunk
+            if (!nincsTobbLehetoseg || osszesPotencial > 0) {
+                let statuszText = "";
+                let statuszColor = "white";
+
+                if (osszesPotencial >= 400) {
+                    statuszText = "ARANY 🏆";
+                    statuszColor = "#ffd700";
+                } 
+                else if (osszesPotencial >= 300) {
+                    statuszText = "EZÜST 🥈";
+                    statuszColor = "#c0c0c0";
+                } else {
+                    statuszText = "BRONZ 🥉";
+                    statuszColor = "#cd7f32";
+                }
+
+                // Kalkuláció részletezése
+                let reszletek = "";
+                if (bestMoves.length > 0) {
+                    reszletek = "<div style='margin-top:5px; font-size:12px; text-align:right; color:#ddd; border-top:1px solid #555; padding-top:3px;'>";
+                    bestMoves.forEach(m => {
+                        reszletek += `+ ${m.name} <span style="color:#aaa">(${m.points})</span><br>`;
+                    });
+                    reszletek += "</div>";
+                }
+
+                kijelzo.style.display = "block";
+                kijelzo.style.borderColor = statuszColor;
+                kijelzo.style.color = statuszColor;
+                
+                kijelzo.innerHTML = `
+                    <div style="font-size:18px; margin-bottom:2px; text-align:right;">${statuszText}</div>
+                    <div style="font-size:14px; color:white; text-align:right;">Max pont: ${osszesPotencial}</div>
+                    ${reszletek}
+                `;
+            }
+        }
+
+    } catch (e) { console.error("Hiba az ellenorizdAPontokat-ban:", e); }
+}
+
+// =============================================================
+// UI ELEMEK LÉTREHOZÁSA (INJEKTÁLÁS)
+// =============================================================
 
 function kijelzoLetrehozasa() {
     if (document.getElementById("pont-kijelzo")) return;
@@ -220,7 +444,7 @@ function kijelzoLetrehozasa() {
     div.style.position = "fixed";
     div.style.top = "10px";
     div.style.right = "10px";
-    div.style.backgroundColor = "rgba(0,0,0,0.85)";
+    div.style.backgroundColor = "rgba(0,0,0,0.9)";
     div.style.color = "white";
     div.style.padding = "10px 15px";
     div.style.borderRadius = "8px";
@@ -278,6 +502,12 @@ function sajatPontKalkulatorLetrehozasa() {
         <div id="lada-eredmeny" style="margin-top:10px; font-weight:bold; font-size:20px; color:#cd7f32;">
             BRONZ
         </div>
+        
+        <hr style="margin: 15px 0; border-color: #555;">
+        
+        <button onclick="location.reload()" style="background-color: #c9302c; color: white; border: none; padding: 10px 20px; font-size: 14px; font-weight: bold; border-radius: 5px; cursor: pointer; width: 100%;">
+            TÖRLÉS (ÚJ JÁTÉK)
+        </button>
     `;
 
     document.body.appendChild(div);
@@ -303,195 +533,4 @@ function sajatPontKalkulatorLetrehozasa() {
         }
         ellenorizdAPontokat(); 
     });
-}
-
-// =============================================================
-//  AZ ÚJ, OKOS ALGORITMUS (Backtracking Optimizer)
-// =============================================================
-
-function calculateMaxDisjointScore(candidates, usedCardsMap) {
-    if (candidates.length === 0) return 0;
-
-    // Rekurzív segédfüggvény
-    function solve(index, currentUsed) {
-        // Alapeset: elfogytak a jelöltek
-        if (index >= candidates.length) return 0;
-
-        let move = candidates[index];
-
-        // 1. opció: NEM választjuk ki ezt a lépést
-        let scoreSkip = solve(index + 1, currentUsed);
-
-        // 2. opció: KIVÁLASZTJUK ezt a lépést (ha nem ütközik)
-        let canPick = true;
-        for (let card of move.cards) {
-            let key = card.c + "-" + card.v;
-            // Ha már felhasználtuk ebben az ágban VAGY eleve nincs a táblán
-            if (currentUsed.has(key)) {
-                canPick = false;
-                break;
-            }
-        }
-
-        let scorePick = 0;
-        if (canPick) {
-            // Lemásoljuk a használt kártyák halmazát és hozzáadjuk a mostaniakat
-            let newUsed = new Set(currentUsed);
-            for (let card of move.cards) {
-                newUsed.add(card.c + "-" + card.v);
-            }
-            scorePick = move.points + solve(index + 1, newUsed);
-        }
-
-        // A jobbikat adjuk vissza
-        return Math.max(scoreSkip, scorePick);
-    }
-
-    // Indulás üres "most felhasznált" halmazzal
-    // (A usedCardsMap azokat tartalmazza, amik MÁR ELTŰNTEK a tábláról, azokat nem kell nézni, 
-    // mert a candidates lista generálásakor már kiszűrtük őket)
-    return solve(0, new Set());
-}
-
-
-function ellenorizdAPontokat() {
-    let baseBtnStyle = "cursor:pointer; padding:6px 12px; margin:3px; display:inline-block; border-radius:6px; font-weight:bold; border:1px solid rgba(255,255,255,0.3); text-align:center; vertical-align:middle;";
-    let html = "<h4 style='margin:0 0 10px 0; text-align:center; color:white;'>Még kirakható:</h4>";
-
-    // Ez a lista tárolja majd az összes lehetséges lépést az OPTIMALIZÁLÓNAK
-    let allCandidates = [];
-
-    try {
-        // -----------------------------------------------------------
-        // 1. GENERÁLÁS ÉS MEGJELENÍTÉS
-        // -----------------------------------------------------------
-
-        // 0. Vegyes Sorok (NEM KATTINTHATÓ)
-        let vanVegyes = false;
-        let vegyesHtml = `<div style="border-bottom:1px solid #444; padding-bottom:5px; margin-bottom:5px;"><strong>Vegyes sorok:</strong><br>`;
-        for (let i = 1; i <= 6; i++) {
-             if (combinacaoDisponivel(i, i + 1, i + 2)) {
-                let pont = (i * 10);
-                
-                // Megkeressük a konkrét kártyákat az optimalizálóhoz
-                // (Vegyesnél csak az első talált kombinációt adjuk be az optimalizálónak egyszerűsítésként)
-                let mixedCards = [];
-                let colorsFound = [];
-                let nums = [i, i+1, i+2];
-                for(let n of nums) {
-                    for(let c=0; c<3; c++) {
-                        if(!cartas_descartadas[c][n-1] && !colorsFound.includes(c)) {
-                            mixedCards.push({c:c, v:n});
-                            colorsFound.push(c);
-                            break;
-                        }
-                    }
-                }
-                
-                if(mixedCards.length === 3) {
-                     allCandidates.push({ points: pont, cards: mixedCards });
-                }
-
-                vegyesHtml += `<span style='padding:6px 12px; margin:3px; display:inline-block; border-radius:6px; font-weight:bold; border:1px solid transparent; text-align:center; background:#2e5e4e; color:#eee; cursor:default; opacity:0.8;'>
-                            ${i}-${i+1}-${i+2} <span style="font-size:0.8em; color:#bbb">(${pont}p)</span>
-                         </span>`;
-                vanVegyes = true;
-            }
-        }
-        vegyesHtml += "</div>";
-        if(vanVegyes) html += vegyesHtml;
-
-
-        // 1. SZÍNES CSOPORTOK
-        for (let c = 0; c < 3; c++) {
-            let vanEbbenSzinben = false;
-            let szinHtml = `<div style="border-bottom:1px solid #444; padding:5px 0; margin-bottom:5px;">`; 
-            szinHtml += `<strong style="color:${CSS_BTN_SZINEK[c].split(';')[1]}">${SZIN_NEVEK[c]}:</strong><br>`;
-
-            for (let i = 1; i <= 6; i++) {
-                if (combinacaoDisponivel(i, i + 1, i + 2, c)) {
-                    let pont = (i * 10) + 40;
-                    
-                    // Hozzáadás az optimalizáló listához
-                    allCandidates.push({
-                        points: pont,
-                        cards: [{c:c, v:i}, {c:c, v:i+1}, {c:c, v:i+2}]
-                    });
-
-                    szinHtml += `<span style='${baseBtnStyle} ${CSS_BTN_SZINEK[c]}' onclick='leadKombinaciot("szin_sor", ${i}, ${i+1}, ${i+2}, ${c})'>
-                                    ${i}-${i+1}-${i+2} <span style="font-size:0.8em; opacity:0.8">(${pont}p)</span>
-                                 </span>`;
-                    vanEbbenSzinben = true;
-                }
-            }
-            szinHtml += `</div>`;
-            if (vanEbbenSzinben) html += szinHtml;
-        }
-
-        // 2. SZETTEK
-        let vanSzett = false;
-        let szettHtml = `<div style="padding-top:5px;"><strong>Szettek:</strong><br>`;
-        for (let i = 1; i <= 8; i++) {
-            if (combinacaoDisponivel(i, i, i)) {
-                let pont = (i * 10) + 10;
-                
-                // Hozzáadás az optimalizáló listához
-                allCandidates.push({
-                    points: pont,
-                    cards: [{c:0, v:i}, {c:1, v:i}, {c:2, v:i}]
-                });
-
-                szettHtml += `<span style='${baseBtnStyle} background:#555; color:white;' onclick='leadKombinaciot("szett", ${i}, ${i}, ${i})'>
-                            ${i}-${i}-${i} <span style="font-size:0.8em; color:#ddd">(${pont}p)</span>
-                         </span>`;
-                vanSzett = true;
-            }
-        }
-        szettHtml += "</div>";
-        if(vanSzett) html += szettHtml;
-
-        // -----------------------------------------------------------
-        // 2. OPTIMALIZÁLÁS (ITT TÖRTÉNIK A VARÁZSLAT)
-        // -----------------------------------------------------------
-        
-        // Kiszámoljuk a valódi maximumot, figyelembe véve az ütközéseket
-        let realMaxPoints = calculateMaxDisjointScore(allCandidates, new Set());
-
-        // --- VÉGE ELLENŐRZÉS ---
-        // Ha nincs jelölt, akkor game over
-        if (allCandidates.length === 0) {
-            nincsTobbLehetoseg = true;
-        } else {
-            nincsTobbLehetoseg = false;
-        }
-
-        // TÁBLÁZAT FRISSÍTÉSE
-        let tablazat = document.getElementById("kombinacio-tablazat");
-        if (tablazat) tablazat.innerHTML = html;
-
-        // --- JOBB FELSŐ KIJELZŐ LOGIKA ---
-        let kijelzo = document.getElementById("pont-kijelzo");
-        let sajatPont = parseInt(document.getElementById("sajat-pont-input").value) || 0;
-        let osszesPotencial = sajatPont + realMaxPoints; // MOST MÁR A DISZJUNKT MAXOT HASZNÁLJUK
-
-        if (kijelzo) {
-            kijelzo.style.display = "none"; 
-            
-            if (!nincsTobbLehetoseg) {
-                if (osszesPotencial >= 400) {
-                    kijelzo.style.display = "block";
-                    kijelzo.innerHTML = "Elérhető: ARANY 🏆";
-                    kijelzo.style.borderColor = "#ffd700";
-                    kijelzo.style.color = "#ffd700";
-                } 
-                else if (osszesPotencial >= 300) {
-                    kijelzo.style.display = "block";
-                    kijelzo.innerHTML = "Elérhető: EZÜST 🥈";
-                    kijelzo.style.borderColor = "#c0c0c0";
-                    kijelzo.style.color = "#c0c0c0";
-                }
-            }
-        }
-
-    } catch (e) { console.error(e); }
 }

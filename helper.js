@@ -10,7 +10,7 @@ const CORES = [
 const CSS_BTN_SZINEK = [
     "background-color: #234ca0; color: white;", // Kék gomb
     "background-color: #bd1c24; color: white;", // Piros gomb
-    "background-color: #f2c916; color: black; text-shadow: 0px 0px 1px white;"  // Sárga gomb (fekete betűvel, hogy olvasható legyen)
+    "background-color: #f2c916; color: black; text-shadow: 0px 0px 1px white;"  // Sárga gomb
 ];
 
 const SZIN_NEVEK = ["Kék", "Piros", "Sárga"];
@@ -45,7 +45,7 @@ function setup() {
         });
     }
 
-    // Eredeti 750-es méret
+    // Eredeti 750-es méret (ahogy korábban kérted)
     let canvasWidth = 750; 
     let canvasHeight = ((canvasWidth/8) * RA_CARTA) * 3 + 1;
     let canvas = createCanvas(canvasWidth, canvasHeight);
@@ -161,9 +161,6 @@ window.leadKombinaciot = function(tipus, p1, p2, p3, extraInfo) {
     adicionarAoHistorico();
     if (window.app) app.a++;
     
-    // Frissítjük a ládát és a táblázatot is!
-    // Mivel a táblázat a 'combinacaoDisponivel'-t használja, és mi most kivettük a kártyákat,
-    // a gomb automatikusan el fog tűnni a következő újrajzoláskor!
     input.dispatchEvent(new Event('input')); 
     ellenorizdAPontokat();
 }
@@ -254,14 +251,14 @@ function tablazatLetrehozasa() {
     div.style.left = "10px";
     div.style.backgroundColor = "rgba(0,0,0,0.95)";
     div.style.color = "white";
-    div.style.padding = "15px";
+    div.style.padding = "10px";
     div.style.borderRadius = "8px";
     div.style.fontFamily = "Arial, sans-serif"; 
     div.style.fontSize = "15px"; 
     div.style.border = "1px solid #777";
     div.style.zIndex = "9999";
-    div.style.maxWidth = "450px"; 
-    div.style.maxHeight = "90vh"; // Ha túl hosszú, görgethető legyen
+    div.style.maxWidth = "480px"; // Kicsit szélesebb, hogy elférjenek egymás mellett
+    div.style.maxHeight = "90vh"; 
     div.style.overflowY = "auto";
     div.innerHTML = "Betöltés...";
     document.body.appendChild(div);
@@ -318,67 +315,65 @@ function sajatPontKalkulatorLetrehozasa() {
     });
 }
 
-// --- FŐ LOGIKA (SZÍNES GOMBOKKAL) ---
+// --- ÚJ LOGIKA: EGYSÉGES LISTA (1-TŐL 8-IG) ---
 function ellenorizdAPontokat() {
     let maxPontMaradek = 0;
     
-    // Alap gomb stílus (méret, keret, betű)
-    let baseBtnStyle = "cursor:pointer; padding:6px 12px; margin:3px; display:inline-block; border-radius:6px; font-weight:bold; border:1px solid rgba(255,255,255,0.3); text-align:center;";
+    // Alap gomb stílus
+    let baseBtnStyle = "cursor:pointer; padding:6px 12px; margin:3px; display:inline-block; border-radius:6px; font-weight:bold; border:1px solid rgba(255,255,255,0.3); text-align:center; vertical-align:middle;";
     
-    let html = "<h4 style='margin:0 0 10px 0; text-align:center; color:white;'>Kattints a kártyákra:</h4>";
+    let html = "<h4 style='margin:0 0 10px 0; text-align:center; color:white;'>Még kirakható:</h4>";
 
     try {
-        // 1. AZONOS SZÍN (Most ez a legfontosabb, legyen elől)
-        html += "<div style='margin-bottom:10px;'>";
-        for (let c = 0; c < 3; c++) {
-            // Nem kell külön fejléc, a színek magukért beszélnek
-            for (let i = 1; i <= 6; i++) {
-                if (combinacaoDisponivel(i, i + 1, i + 2, c)) {
-                    let pont = (i * 10) + 40;
-                    maxPontMaradek += pont;
-                    // SZÍNES GOMB GENERÁLÁSA
-                    html += `<span style='${baseBtnStyle} ${CSS_BTN_SZINEK[c]}' onclick='leadKombinaciot("szin_sor", ${i}, ${i+1}, ${i+2}, ${c})'>
-                                    ${i}-${i+1}-${i+2} <span style="font-size:0.8em; opacity:0.8">(${pont})</span>
-                                 </span>`;
-                }
-            }
-        }
-        html += "</div>";
-        html += "<hr style='border-color:#555; margin: 5px 0;'>";
-
-        // 2. SZETTEK (pl. 1-1-1) - Szürke háttér, színes keret
-        html += "<div style='margin-bottom:5px;'><small style='color:#ccc'>Szettek:</small><br>";
-        let vanSzett = false;
+        // Egyetlen ciklus megy végig az összes számon (1-től 8-ig)
+        // Így minden egy sorba kerül, ami azonos számmal kezdődik
         for (let i = 1; i <= 8; i++) {
+            
+            let vanValamiEbbenASorban = false;
+            let sorHtml = `<div style="border-bottom:1px solid #444; padding:5px 0;">`; // Sor elválasztó
+            
+            // 1. SZETTEK (Pl. 1-1-1) - Szürke gomb
             if (combinacaoDisponivel(i, i, i)) {
                 let pont = (i * 10) + 10;
                 maxPontMaradek += pont;
-                // Semleges, de jól látható gomb
-                html += `<span style='${baseBtnStyle} background:#444; color:white; border:1px solid #aaa;' onclick='leadKombinaciot("szett", ${i}, ${i}, ${i})'>
-                            ${i}-${i}-${i} <span style="color:#aaa; font-size:0.8em">(${pont})</span>
+                sorHtml += `<span style='${baseBtnStyle} background:#555; color:white;' onclick='leadKombinaciot("szett", ${i}, ${i}, ${i})'>
+                            ${i}-${i}-${i} <span style="font-size:0.8em; color:#ddd">(${pont}p)</span>
                          </span>`;
-                vanSzett = true;
+                vanValamiEbbenASorban = true;
             }
-        }
-        if(!vanSzett) html += "<span style='opacity:0.3; font-size:0.8em'>-</span>";
-        html += "</div>";
 
-        // 3. VEGYES SZÍN - Külön szín (pl. Zöldes vagy Sötétkék)
-        html += "<div style='margin-bottom:5px;'><small style='color:#ccc'>Vegyes:</small><br>";
-        let vanVegyes = false;
-        for (let i = 1; i <= 6; i++) {
-            if (combinacaoDisponivel(i, i + 1, i + 2)) {
-                let pont = (i * 10);
-                maxPontMaradek += pont;
-                // Zöldes árnyalat, hogy elkülönüljön
-                html += `<span style='${baseBtnStyle} background:#2e5e4e; color:white;' onclick='leadKombinaciot("vegyes_sor", ${i}, ${i+1}, ${i+2})'>
-                            ${i}-${i+1}-${i+2} <span style="color:#ddd; font-size:0.8em">(${pont})</span>
-                         </span>`;
-                vanVegyes = true;
+            // A sorozatok csak 6-ig menne (mert 6-7-8 az utolsó)
+            if (i <= 6) {
+                // 2. VEGYES SZÍN (Pl. 1-2-3) - Zöldes gomb
+                if (combinacaoDisponivel(i, i + 1, i + 2)) {
+                    let pont = (i * 10);
+                    maxPontMaradek += pont;
+                    sorHtml += `<span style='${baseBtnStyle} background:#2e5e4e; color:white;' onclick='leadKombinaciot("vegyes_sor", ${i}, ${i+1}, ${i+2})'>
+                                ${i}-${i+1}-${i+2} <span style="font-size:0.8em; color:#bbb">(${pont}p)</span>
+                             </span>`;
+                    vanValamiEbbenASorban = true;
+                }
+
+                // 3. SZÍNES GOMBOK (Kék, Piros, Sárga 1-2-3)
+                for (let c = 0; c < 3; c++) {
+                    if (combinacaoDisponivel(i, i + 1, i + 2, c)) {
+                        let pont = (i * 10) + 40;
+                        maxPontMaradek += pont;
+                        sorHtml += `<span style='${baseBtnStyle} ${CSS_BTN_SZINEK[c]}' onclick='leadKombinaciot("szin_sor", ${i}, ${i+1}, ${i+2}, ${c})'>
+                                        ${i}-${i+1}-${i+2} <span style="font-size:0.8em; opacity:0.8">(${pont}p)</span>
+                                     </span>`;
+                        vanValamiEbbenASorban = true;
+                    }
+                }
+            }
+
+            sorHtml += `</div>`;
+            
+            // Csak akkor írjuk ki a sort, ha van benne elérhető gomb
+            if (vanValamiEbbenASorban) {
+                html += sorHtml;
             }
         }
-        if(!vanVegyes) html += "<span style='opacity:0.3; font-size:0.8em'>-</span>";
-        html += "</div>";
 
         // TÁBLÁZAT FRISSÍTÉSE
         let tablazat = document.getElementById("kombinacio-tablazat");
@@ -390,7 +385,7 @@ function ellenorizdAPontokat() {
         let osszesPotencial = sajatPont + maxPontMaradek;
 
         if (kijelzo) {
-            kijelzo.style.display = "none"; // Alapból rejtett
+            kijelzo.style.display = "none"; 
             
             if (osszesPotencial >= 400) {
                 kijelzo.style.display = "block";

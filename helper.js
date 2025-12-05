@@ -6,7 +6,7 @@ const CORES = [
     [225, 182, 21] // Sárga
 ];
 
-const CSS_SZINEK = ["#4da6ff", "#ff4d4d", "#ffd700"];
+const CSS_SZINEK = ["#4da6ff", "#ff4d4d", "#ffd700"]; // Kék, Piros, Arany szövegekhez
 const SZIN_NEVEK = ["Kék", "Piros", "Sárga"];
 
 // --- JÁTÉK ÁLLAPOT ---
@@ -15,17 +15,15 @@ let historico = {
     dados: []
 };
 
-let cartas_descartadas = []; // Ezek már kimentek (Szürke)
-let kijelolt_kartyak = [];   // Ezeket most jelölted ki (Zöld)
+let cartas_descartadas = [];
 let jatekVege = false;
 
 // --- INDÍTÁS ---
 function setup() {
-    // 1. Kijelzők létrehozása
-    kijelzoLetrehozasa();       
-    tablazatLetrehozasa();      
-    sajatPontKalkulatorLetrehozasa(); 
-    gombokLetrehozasa(); // ÚJ: Vezérlő gombok
+    // Kijelzők létrehozása
+    kijelzoLetrehozasa();       // Jobb felül: Max potenciál
+    tablazatLetrehozasa();      // Bal felül: Kattintható kombinációk
+    sajatPontKalkulatorLetrehozasa(); // Jobb alul: Saját pont
 
     iniciarJogo();
 
@@ -43,7 +41,8 @@ function setup() {
         });
     }
 
-    let canvasWidth = 950; 
+    // --- VISSZAÁLLÍTVA AZ EREDETI MÉRETRE (750) ---
+    let canvasWidth = 750; 
     let canvasHeight = ((canvasWidth/8) * RA_CARTA) * 3 + 1;
     let canvas = createCanvas(canvasWidth, canvasHeight);
     canvas.parent('game');
@@ -51,7 +50,6 @@ function setup() {
 
 function iniciarJogo() {
     cartas_descartadas = [];
-    kijelolt_kartyak = [];
     for (let cor = 0; cor < 3; cor++) {
         cartas_descartadas.push([]);
         for (let carta = 0; carta < 8; carta++) {
@@ -76,21 +74,12 @@ function draw() {
             let x = LARGURA_CARTA * (carta - 1);
             let y = ALTURA_CARTA * cor;
         
-            // Alap kártya
             fill(CORES[cor]);
-            
-            // Ha már eldobták (Végleges)
-            if (cartas_descartadas[cor][carta - 1]) fill(50); 
+            // Ha már eldobták/felhasználták (Szürke)
+            if (cartas_descartadas[cor][carta - 1]) fill(70); 
             
             stroke(0);
             strokeWeight(1);
-            
-            // Ha KI VAN JELÖLVE (Zöld keret)
-            if (isKijelolve(cor, carta)) {
-                stroke(0, 255, 0); // Zöld
-                strokeWeight(5);
-            }
-
             rect(x, y, LARGURA_CARTA, ALTURA_CARTA);
 
             let centroX = x + (LARGURA_CARTA / 2);
@@ -98,30 +87,16 @@ function draw() {
 
             fill(255);
             textAlign(CENTER, CENTER);
-            textSize(28); 
+            textSize(24); // Visszaállítva az eredeti betűméretre
             stroke(0);
             strokeWeight(3);
             text(carta, centroX, centroY);
-
-            // Game Over X
-            if (jatekVege && !cartas_descartadas[cor][carta - 1] && !isKijelolve(cor, carta)) {
-                stroke(255, 0, 0);
-                strokeWeight(5);
-                line(x, y, x + LARGURA_CARTA, y + ALTURA_CARTA);
-                line(x + LARGURA_CARTA, y, x, y + ALTURA_CARTA);
-            }
         }
     }
 }
 
-// Segédfüggvény: Benne van-e a kijelöltek között?
-function isKijelolve(cor, carta) {
-    for(let k of kijelolt_kartyak) {
-        if (k.cor === cor && k.carta === carta) return true;
-    }
-    return false;
-}
-
+// KATTINTÁS A VÁSZNON (KÁRTYÁK ELDOBÁSA)
+// Ha itt kattintasz, az csak "eltünteti" a kártyát, NEM ad pontot (pl. ellenfél eldobta)
 function mousePressed() {
     if (mouseX < 0 || mouseX > width || mouseY < 0 || mouseY > height) return;
 
@@ -134,163 +109,69 @@ function mousePressed() {
         let carta = (x % 8) + 1;
 
         if (cor >= 0 && cor < 3 && carta >= 1 && carta <= 8) {
-            // Ha már eldobott (szürke), nem csinálunk semmit
-            if (cartas_descartadas[cor][carta - 1]) return;
-
-            // KIJELÖLÉS LOGIKA
-            if (isKijelolve(cor, carta)) {
-                // Ha már ki volt jelölve, vegyük le a kijelölést
-                kijelolt_kartyak = kijelolt_kartyak.filter(k => !(k.cor === cor && k.carta === carta));
-            } else {
-                // Ha még nincs, adjuk hozzá
-                if (kijelolt_kartyak.length < 3) { // Max 3-at engedjünk egyszerre (opcionális)
-                     kijelolt_kartyak.push({cor: cor, carta: carta});
-                } else {
-                    // Ha már 3 van, a legrégebbit kivesszük, és berakjuk az újat (hogy gördülékeny legyen)
-                    kijelolt_kartyak.shift();
-                    kijelolt_kartyak.push({cor: cor, carta: carta});
-                }
+            if (!cartas_descartadas[cor][carta - 1]) {
+                 cartas_descartadas[cor][carta - 1] = true;
+                 adicionarAoHistorico();
+                 if (window.app) app.a++;
+                 ellenorizdAPontokat();
             }
         }
     }
 }
 
-// --- ÚJ GOMBOK VEZÉRLÉSE ---
-
-function gombokLetrehozasa() {
-    if (document.getElementById("vezerlo-gombok")) return;
-
-    let container = document.createElement("div");
-    container.id = "vezerlo-gombok";
-    container.style.position = "fixed";
-    container.style.bottom = "20px";
-    container.style.left = "50%";
-    container.style.transform = "translateX(-50%)";
-    container.style.display = "flex";
-    container.style.gap = "20px";
-    container.style.zIndex = "9999";
-
-    // GOMB 1: Kombináció Lerakása
-    let btnLerakas = document.createElement("button");
-    btnLerakas.innerHTML = "✅ Kombináció Lerakása";
-    btnLerakas.style.padding = "15px 25px";
-    btnLerakas.style.fontSize = "18px";
-    btnLerakas.style.fontWeight = "bold";
-    btnLerakas.style.backgroundColor = "#28a745"; // Zöld
-    btnLerakas.style.color = "white";
-    btnLerakas.style.border = "none";
-    btnLerakas.style.borderRadius = "8px";
-    btnLerakas.style.cursor = "pointer";
-    btnLerakas.onclick = function() {
-        if (kijelolt_kartyak.length !== 3) {
-            alert("Kérlek jelölj ki pontosan 3 kártyát a kombinációhoz!");
-            return;
-        }
-        feldolgozKombinacio();
-    };
-
-    // GOMB 2: Eldobás (Kuka)
-    let btnEldobas = document.createElement("button");
-    btnEldobas.innerHTML = "🗑️ Eldobás (Kuka)";
-    btnEldobas.style.padding = "15px 25px";
-    btnEldobas.style.fontSize = "18px";
-    btnEldobas.style.fontWeight = "bold";
-    btnEldobas.style.backgroundColor = "#dc3545"; // Piros
-    btnEldobas.style.color = "white";
-    btnEldobas.style.border = "none";
-    btnEldobas.style.borderRadius = "8px";
-    btnEldobas.style.cursor = "pointer";
-    btnEldobas.onclick = function() {
-        if (kijelolt_kartyak.length === 0) {
-            alert("Nincs kijelölve kártya!");
-            return;
-        }
-        veglegesitEldobas();
-    };
-
-    container.appendChild(btnLerakas);
-    container.appendChild(btnEldobas);
-    document.body.appendChild(container);
-}
-
-// --- PONT SZÁMÍTÁSI LOGIKA ---
-
-function feldolgozKombinacio() {
-    // 1. Kártyák sorbarendezése érték szerint
-    let k = kijelolt_kartyak.sort((x, y) => x.carta - y.carta);
-    
-    let a = k[0].carta;
-    let b = k[1].carta;
-    let c = k[2].carta;
-    
+// --- ÚJ FUNKCIÓ: KATTINTÁS A TÁBLÁZATBAN ---
+// Ez a függvény fut le, ha a bal felső táblázatban rákattintasz egy sorra
+window.leadKombinaciot = function(tipus, p1, p2, p3, extraInfo) {
     let pont = 0;
-    let valid = false;
-    let uzenet = "";
-
-    // ESET A: Egyforma számok (SZETT) - pl. 1-1-1
-    if (a === b && b === c) {
-        // Ellenőrizzük, hogy különböző színek-e
-        let szinek = [k[0].cor, k[1].cor, k[2].cor].sort();
-        // A te szabályaid szerint a szett lehet 20, 30...90 pont
-        // Függetlenül attól hogy milyen színek, ha 3 egyforma szám van, az érvényes
-        pont = (a * 10) + 10; 
-        valid = true;
-        uzenet = "Szett (+ " + pont + " pont)";
-    }
-    // ESET B: Sorozat (SOR) - pl. 1-2-3
-    else if (a + 1 === b && b + 1 === c) {
-        // Megnézzük a színeket
-        let szinA = k[0].cor;
-        let szinB = k[1].cor;
-        let szinC = k[2].cor;
-
-        if (szinA === szinB && szinB === szinC) {
-            // AZONOS SZÍNŰ SOR
-            pont = (a * 10) + 40; // pl 1-2-3 = 50 pont
-            valid = true;
-            uzenet = "Színes Sor (+ " + pont + " pont)";
-        } else {
-            // VEGYES SZÍNŰ SOR
-            pont = (a * 10); // pl 1-2-3 = 10 pont
-            valid = true;
-            uzenet = "Vegyes Sor (+ " + pont + " pont)";
+    
+    // 1. Kártyák levétele (Kuka)
+    if (tipus === 'szin_sor') { // Azonos színű sor
+        let cor = extraInfo; 
+        // p1, p2, p3 a kártyaszámok (pl 1, 2, 3)
+        cartas_descartadas[cor][p1-1] = true;
+        cartas_descartadas[cor][p2-1] = true;
+        cartas_descartadas[cor][p3-1] = true;
+        pont = (p1 * 10) + 40; // Pontszámítás
+    } 
+    else if (tipus === 'vegyes_sor') { // Vegyes sor
+        // Megkeressük az első elérhető színeket ehhez a sorhoz
+        let lapok = [p1, p2, p3];
+        for(let val of lapok) {
+            // Megkeressük melyik színben van még meg ez a szám
+            for(let c=0; c<3; c++) {
+                if(!cartas_descartadas[c][val-1]) {
+                    cartas_descartadas[c][val-1] = true;
+                    break; // Megvan, menjünk a következő számra
+                }
+            }
         }
+        pont = (p1 * 10);
+    }
+    else if (tipus === 'szett') { // 1-1-1
+        let val = p1;
+        // Mindhárom színből kivesszük
+        cartas_descartadas[0][val-1] = true;
+        cartas_descartadas[1][val-1] = true;
+        cartas_descartadas[2][val-1] = true;
+        pont = (val * 10) + 10;
     }
 
-    if (valid) {
-        // Pont hozzáadása a számlálóhoz
-        hozzaadPontot(pont);
-        // Alert helyett Console log vagy kis értesítés
-        console.log(uzenet); 
-        // Kártyák véglegesítése
-        veglegesitEldobas();
-    } else {
-        alert("Ez nem érvényes kombináció! (Sem szett, sem sor)");
-    }
-}
-
-function hozzaadPontot(pont) {
+    // 2. Pont hozzáírása
     let input = document.getElementById("sajat-pont-input");
     let jelenlegi = parseInt(input.value) || 0;
     input.value = jelenlegi + pont;
-    // Triggereljük az eseményt, hogy a láda színe frissüljön
-    input.dispatchEvent(new Event('input'));
-}
-
-function veglegesitEldobas() {
-    // Átrakjuk a kijelölteket a 'cartas_descartadas' tömbbe
-    for (let k of kijelolt_kartyak) {
-        cartas_descartadas[k.cor][k.carta - 1] = true;
-    }
-    // Töröljük a kijelölést
-    kijelolt_kartyak = [];
     
+    // Frissítések
     adicionarAoHistorico();
     if (window.app) app.a++;
-    ellenorizdAPontokat(); // Újraszámolja a maradék lehetőségeket
+    
+    // Láda színének frissítése
+    input.dispatchEvent(new Event('input')); 
+    ellenorizdAPontokat();
 }
 
-// --- LOGIKA (UNDO/HISTORY) ---
+
+// --- LOGIKA ---
 function limpar() {
     historico.pos = 1;
     desfazer();
@@ -309,7 +190,6 @@ function refazer() {
 function carregarDoHistorico(pos) {
     let dados = JSON.parse(JSON.stringify(historico.dados[pos]));
     cartas_descartadas = dados.cartas_descartadas;
-    kijelolt_kartyak = []; // History töltéskor töröljük a kijelölést
     if (window.app) app.a++;
     ellenorizdAPontokat();
 }
@@ -348,6 +228,7 @@ function combinacaoDisponivel(a, b, c, cor = -1) {
 
 // --- KIJELZŐK ---
 
+// 1. Jobb felső: Max Potenciál
 function kijelzoLetrehozasa() {
     if (document.getElementById("pont-kijelzo")) return;
     let div = document.createElement("div");
@@ -355,18 +236,19 @@ function kijelzoLetrehozasa() {
     div.style.position = "fixed";
     div.style.top = "10px";
     div.style.right = "10px";
-    div.style.backgroundColor = "rgba(0,0,0,0.9)";
+    div.style.backgroundColor = "rgba(0,0,0,0.8)";
     div.style.color = "white";
     div.style.padding = "10px 20px";
     div.style.borderRadius = "8px";
     div.style.fontFamily = "Arial, sans-serif";
     div.style.fontWeight = "bold";
-    div.style.border = "2px solid gold";
+    div.style.border = "2px solid white";
     div.style.zIndex = "9999";
-    div.innerHTML = "Számolás...";
+    div.innerHTML = "...";
     document.body.appendChild(div);
 }
 
+// 2. Bal felső: NAGY KATTINTHATÓ TÁBLÁZAT
 function tablazatLetrehozasa() {
     if (document.getElementById("kombinacio-tablazat")) return;
     let div = document.createElement("div");
@@ -374,19 +256,20 @@ function tablazatLetrehozasa() {
     div.style.position = "fixed";
     div.style.top = "10px";
     div.style.left = "10px";
-    div.style.backgroundColor = "rgba(0,0,0,0.9)";
+    div.style.backgroundColor = "rgba(0,0,0,0.95)";
     div.style.color = "white";
-    div.style.padding = "10px";
+    div.style.padding = "15px";
     div.style.borderRadius = "8px";
-    div.style.fontFamily = "monospace";
-    div.style.fontSize = "14px";
-    div.style.border = "1px solid #555";
+    div.style.fontFamily = "Arial, sans-serif"; // Jobban olvasható
+    div.style.fontSize = "16px"; // Nagyobb betűméret
+    div.style.border = "1px solid #777";
     div.style.zIndex = "9999";
-    div.style.maxWidth = "350px";
+    div.style.maxWidth = "400px";
     div.innerHTML = "Betöltés...";
     document.body.appendChild(div);
 }
 
+// 3. Jobb alsó: Saját Pont
 function sajatPontKalkulatorLetrehozasa() {
     if (document.getElementById("sajat-pont-doboz")) return;
 
@@ -395,7 +278,7 @@ function sajatPontKalkulatorLetrehozasa() {
     div.style.position = "fixed";
     div.style.bottom = "20px";
     div.style.right = "20px";
-    div.style.backgroundColor = "rgba(0,0,0,0.95)";
+    div.style.backgroundColor = "rgba(0,0,0,0.9)";
     div.style.color = "white";
     div.style.padding = "15px";
     div.style.borderRadius = "10px";
@@ -407,9 +290,9 @@ function sajatPontKalkulatorLetrehozasa() {
 
     div.innerHTML = `
         <div style="margin-bottom:8px; font-weight:bold;">Saját Pontom:</div>
-        <input type="number" id="sajat-pont-input" style="width:80px; padding:5px; font-size:18px; text-align:center; border-radius:5px; border:none;" value="0">
-        <div id="lada-eredmeny" style="margin-top:10px; font-weight:bold; font-size:18px; color:#cd7f32;">
-            Vidám BRONZ láda
+        <input type="number" id="sajat-pont-input" style="width:80px; padding:5px; font-size:24px; text-align:center; border-radius:5px; border:none;" value="0">
+        <div id="lada-eredmeny" style="margin-top:10px; font-weight:bold; font-size:20px; color:#cd7f32;">
+            BRONZ
         </div>
     `;
 
@@ -422,63 +305,117 @@ function sajatPontKalkulatorLetrehozasa() {
         let pont = parseInt(this.value) || 0;
         
         if (pont >= 400) {
-            eredmenyMezo.innerHTML = "Vidám ARANY láda";
+            eredmenyMezo.innerHTML = "ARANY láda";
             eredmenyMezo.style.color = "#ffd700"; 
             div.style.border = "2px solid #ffd700";
         } else if (pont >= 300) {
-            eredmenyMezo.innerHTML = "Vidám EZÜST láda";
+            eredmenyMezo.innerHTML = "EZÜST láda";
             eredmenyMezo.style.color = "#c0c0c0"; 
             div.style.border = "2px solid #c0c0c0";
         } else {
-            eredmenyMezo.innerHTML = "Vidám BRONZ láda";
+            eredmenyMezo.innerHTML = "BRONZ láda";
             eredmenyMezo.style.color = "#cd7f32"; 
             div.style.border = "2px solid #cd7f32";
         }
+        
+        // Ha változik a pontunk, frissíteni kell a fenti kalkulátort is!
+        ellenorizdAPontokat(); 
     });
 }
 
+// --- FŐ LOGIKA FRISSÍTVE ---
 function ellenorizdAPontokat() {
-    let maxPont = 0;
-    let html = "<h4 style='margin:0 0 5px 0; text-align:center; color:white;'>Még kirakható:</h4>";
+    let maxPontMaradek = 0;
+    
+    // HTML Stílus a gomboknak
+    let btnStyle = "cursor:pointer; border:1px solid #555; padding:3px 8px; margin:2px; display:inline-block; border-radius:4px; background:#333;";
+    let html = "<h4 style='margin:0 0 10px 0; text-align:center; color:white;'>Kattints a lerakáshoz:</h4>";
 
     try {
+        // 1. SZETTEK (pl. 1-1-1)
+        let vanSzett = false;
+        html += "<div style='margin-bottom:5px;'><strong>Szettek:</strong><br>";
         for (let i = 1; i <= 8; i++) {
-            if (combinacaoDisponivel(i, i, i)) maxPont += (i * 10) + 10;
+            if (combinacaoDisponivel(i, i, i)) {
+                let pont = (i * 10) + 10;
+                maxPontMaradek += pont;
+                // KATTINTHATÓ GOMB LÉTREHOZÁSA
+                html += `<span style='${btnStyle}' onclick='leadKombinaciot("szett", ${i}, ${i}, ${i})'>
+                            ${i}-${i}-${i} <span style="color:#aaa; font-size:0.8em">(${pont}p)</span>
+                         </span>`;
+                vanSzett = true;
+            }
         }
+        if(!vanSzett) html += "<span style='opacity:0.5; font-size:0.8em'>Nincs elérhető</span>";
+        html += "</div>";
+
+        // 2. VEGYES SZÍN
+        let vanVegyes = false;
+        html += "<div style='margin-bottom:5px;'><strong>Vegyes sorok:</strong><br>";
         for (let i = 1; i <= 6; i++) {
-            if (combinacaoDisponivel(i, i + 1, i + 2)) maxPont += (i * 10);
+            if (combinacaoDisponivel(i, i + 1, i + 2)) {
+                let pont = (i * 10);
+                maxPontMaradek += pont;
+                html += `<span style='${btnStyle}' onclick='leadKombinaciot("vegyes_sor", ${i}, ${i+1}, ${i+2})'>
+                            ${i}-${i+1}-${i+2} <span style="color:#aaa; font-size:0.8em">(${pont}p)</span>
+                         </span>`;
+                vanVegyes = true;
+            }
         }
+        if(!vanVegyes) html += "<span style='opacity:0.5; font-size:0.8em'>Nincs elérhető</span>";
+        html += "</div>";
+
+        // 3. AZONOS SZÍN
+        html += "<hr style='border-color:#444'>";
         for (let c = 0; c < 3; c++) {
             let sorTalalt = false;
-            let szinHtml = `<div style='margin-bottom:2px; color:${CSS_SZINEK[c]}'><strong>${SZIN_NEVEK[c]}: </strong>`;
+            let szinHtml = `<div style='margin-bottom:5px; color:${CSS_SZINEK[c]}'><strong>${SZIN_NEVEK[c]}: </strong><br>`;
+            
             for (let i = 1; i <= 6; i++) {
                 if (combinacaoDisponivel(i, i + 1, i + 2, c)) {
-                    maxPont += (i * 10) + 40;
-                    szinHtml += `<span style='border:1px solid #444; padding:0 3px; margin:0 2px; display:inline-block;'>${i}-${i+1}-${i+2}</span>`;
+                    let pont = (i * 10) + 40;
+                    maxPontMaradek += pont;
+                    // KATTINTHATÓ GOMB
+                    szinHtml += `<span style='${btnStyle} border-color:${CSS_SZINEK[c]}' onclick='leadKombinaciot("szin_sor", ${i}, ${i+1}, ${i+2}, ${c})'>
+                                    ${i}-${i+1}-${i+2}
+                                 </span>`;
                     sorTalalt = true;
                 }
             }
-            if (!sorTalalt) szinHtml += "<span style='opacity:0.3'>-</span>";
+            if (!sorTalalt) szinHtml += "<span style='opacity:0.3; font-size:0.8em'>-</span>";
             szinHtml += "</div>";
             html += szinHtml;
         }
 
+        // TÁBLÁZAT FRISSÍTÉSE
         let tablazat = document.getElementById("kombinacio-tablazat");
         if (tablazat) tablazat.innerHTML = html;
 
+        // --- JOBB FELSŐ KIJELZŐ LOGIKA ---
         let kijelzo = document.getElementById("pont-kijelzo");
+        let sajatPont = parseInt(document.getElementById("sajat-pont-input").value) || 0;
+        let osszesPotencial = sajatPont + maxPontMaradek;
+
         if (kijelzo) {
-            kijelzo.innerHTML = "Max elérhető: " + maxPont;
-            if (maxPont < 300) {
-                kijelzo.style.borderColor = "red";
-                kijelzo.style.color = "#ff6666";
-                kijelzo.innerHTML += "<br><span style='font-size:0.8em'>(Nincs meg a 300!)</span>";
-                jatekVege = true;
-            } else {
-                kijelzo.style.borderColor = "gold";
-                kijelzo.style.color = "white";
-                jatekVege = false;
+            // Alapértelmezett: eltűnik, ha nincs remény
+            kijelzo.style.display = "none"; 
+
+            // Logic: Ha van még esély Aranyra vagy Ezüstre
+            if (osszesPotencial >= 400) {
+                kijelzo.style.display = "block";
+                kijelzo.innerHTML = "Elérhető: ARANY 🏆";
+                kijelzo.style.borderColor = "#ffd700";
+                kijelzo.style.color = "#ffd700";
+            } 
+            else if (osszesPotencial >= 300) {
+                kijelzo.style.display = "block";
+                kijelzo.innerHTML = "Elérhető: EZÜST 🥈<br><span style='font-size:0.7em; color:white'>(Arany elveszett)</span>";
+                kijelzo.style.borderColor = "#c0c0c0";
+                kijelzo.style.color = "#c0c0c0";
             }
+            // Ha 300 alatt van az összes potenciál, akkor eltűnik (ahogy kérted),
+            // VAGY ha nagyon szeretnéd látni, hogy game over, kiveheted a fenti "display:none"-t.
         }
+
     } catch (e) { console.error(e); }
 }

@@ -7,21 +7,14 @@
     <title>Metin2 - Okey Helper</title>
     <link href="https://use.fontawesome.com/releases/v5.3.1/css/all.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300&display=swap" rel="stylesheet">
+    
     <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
-    <script src="p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    
     <script src="helper.js"></script>
-    <script src="//cookieinfoscript.com/js/cookieinfo.min.js" type="text/javascript" id="cookieinfo"></script>
-    <!-- Global site tag (gtag.js) - Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-177843690-1"></script>
-    <script>
-        if (/wadeira.github.io\/okey-helper/.test(location.href)) {
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
 
-            gtag('config', 'UA-177843690-1');
-        }
-    </script>
+    <script src="//cookieinfoscript.com/js/cookieinfo.min.js" type="text/javascript" id="cookieinfo"></script>
+    
     <style>
         * { font-family: 'Roboto', sans-serif; }
         body { background: #101015; color: white }
@@ -34,13 +27,16 @@
             padding: 5px;
             border: 1px solid white;
             margin: 2px;
+            cursor: pointer; /* Egér kurzor jelzés */
+        }
+        .controls i:hover {
+            background-color: rgba(255,255,255,0.1);
         }
 
         .points { margin: auto }
         .points table { display: inline }
 
         .points table {
-            /*display: inline;*/
             border-collapse: collapse;
         }
 
@@ -66,6 +62,7 @@
 
         .footer {
             margin-top: 25px;
+            margin-bottom: 50px; /* Helyet hagyunk a doboznak */
         }
         
         .footer a {
@@ -73,16 +70,65 @@
             text-decoration: none;
         }
 
+        /* --- ÚJ RÉSZ: A LÁDA DOBOZ STÍLUSA --- */
+        #sajat-pont-doboz {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: rgba(0,0,0,0.9);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #cd7f32; /* Alapból Bronz szín */
+            z-index: 9999;
+            text-align: center;
+            min-width: 200px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        #sajat-pont-input {
+            width: 80px; 
+            padding: 5px; 
+            font-size: 24px; 
+            text-align: center; 
+            border-radius: 5px; 
+            border: none;
+            font-weight: bold;
+        }
+
+        #lada-kep {
+            transition: transform 0.2s;
+        }
+        
+        /* Gomb stílusa a dobozban */
+        .reset-btn {
+            background-color: #c9302c; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            font-size: 14px; 
+            font-weight: bold; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            width: 100%;
+        }
+        .reset-btn:hover {
+            background-color: #d9534f;
+        }
+
     </style>
 </head>
 <body>
     <div class="container" id="app">
+        
         <div id="game"></div>
+        
         <div class="controls">
-            <i onclick="desfazer()" class="fa fa-undo"></i>
-            <i onclick="refazer()" class="fa fa-redo"></i>
-            <i onclick="limpar()" class="fas fa-eraser"></i>
+            <i onclick="desfazer()" class="fa fa-undo" title="Visszavonás"></i>
+            <i onclick="refazer()" class="fa fa-redo" title="Újra"></i>
+            <i onclick="limpar()" class="fas fa-eraser" title="Törlés"></i>
         </div>
+
         <div class="points">
             <table>
                 <tr>
@@ -118,30 +164,18 @@
                     <td>Cards</td><td>Mixed Color</td><td>Same Color</td>
                 </tr>
                 <tr>
-                    <td>
-                        1-2-3
-                    </td>
-                    <td>
-                        10
-                        <img src="circle_all.png" v-if="combinacaoDisponivel(1,2,3)">
-                    </td>
-                    <td>
-                        50 
+                    <td>1-2-3</td>
+                    <td>10 <img src="circle_all.png" v-if="combinacaoDisponivel(1,2,3)"></td>
+                    <td>50 
                         <img src="circle_blue.png" v-if="combinacaoDisponivel(1,2,3, 0)">
                         <img src="circle_red.png" v-if="combinacaoDisponivel(1,2,3, 1)">
                         <img src="circle_yellow.png" v-if="combinacaoDisponivel(1,2,3, 2)">
                     </td>
                 </tr>
                 <tr>
-                    <td>
-                        2-3-4
-                    </td>
-                    <td>
-                        20
-                        <img src="circle_all.png" v-if="combinacaoDisponivel(2,3,4)">
-                    </td>
-                    <td>
-                        60 
+                    <td>2-3-4</td>
+                    <td>20 <img src="circle_all.png" v-if="combinacaoDisponivel(2,3,4)"></td>
+                    <td>60 
                         <img src="circle_blue.png" v-if="combinacaoDisponivel(2,3,4, 0)">
                         <img src="circle_red.png" v-if="combinacaoDisponivel(2,3,4, 1)">
                         <img src="circle_yellow.png" v-if="combinacaoDisponivel(2,3,4, 2)">
@@ -149,12 +183,8 @@
                 </tr>
                 <tr>
                     <td>3-4-5</td>
-                    <td>
-                        30
-                        <img src="circle_all.png" v-if="combinacaoDisponivel(3,4,5)">
-                    </td>
-                    <td>
-                        70 
+                    <td>30 <img src="circle_all.png" v-if="combinacaoDisponivel(3,4,5)"></td>
+                    <td>70 
                         <img src="circle_blue.png" v-if="combinacaoDisponivel(3,4,5, 0)">
                         <img src="circle_red.png" v-if="combinacaoDisponivel(3,4,5, 1)">
                         <img src="circle_yellow.png" v-if="combinacaoDisponivel(3,4,5, 2)">
@@ -162,12 +192,8 @@
                 </tr>
                 <tr>
                     <td>4-5-6</td>
-                    <td>
-                        40
-                        <img src="circle_all.png" v-if="combinacaoDisponivel(4,5,6)">
-                    </td>
-                    <td>
-                        80 
+                    <td>40 <img src="circle_all.png" v-if="combinacaoDisponivel(4,5,6)"></td>
+                    <td>80 
                         <img src="circle_blue.png" v-if="combinacaoDisponivel(4,5,6, 0)">
                         <img src="circle_red.png" v-if="combinacaoDisponivel(4,5,6, 1)">
                         <img src="circle_yellow.png" v-if="combinacaoDisponivel(4,5,6, 2)">
@@ -175,12 +201,8 @@
                 </tr>
                 <tr>
                     <td>5-6-7</td>
-                    <td>
-                        50
-                        <img src="circle_all.png" v-if="combinacaoDisponivel(5,6,7)">
-                    </td>
-                    <td>
-                        90 
+                    <td>50 <img src="circle_all.png" v-if="combinacaoDisponivel(5,6,7)"></td>
+                    <td>90 
                         <img src="circle_blue.png" v-if="combinacaoDisponivel(5,6,7, 0)">
                         <img src="circle_red.png" v-if="combinacaoDisponivel(5,6,7, 1)">
                         <img src="circle_yellow.png" v-if="combinacaoDisponivel(5,6,7, 2)">
@@ -188,12 +210,8 @@
                 </tr>
                 <tr>
                     <td>6-7-8</td>
-                    <td>
-                        60
-                        <img src="circle_all.png" v-if="combinacaoDisponivel(6,7,8)">
-                    </td>
-                    <td>
-                        100 
+                    <td>60 <img src="circle_all.png" v-if="combinacaoDisponivel(6,7,8)"></td>
+                    <td>100 
                         <img src="circle_blue.png" v-if="combinacaoDisponivel(6,7,8, 0)">
                         <img src="circle_red.png" v-if="combinacaoDisponivel(6,7,8, 1)">
                         <img src="circle_yellow.png" v-if="combinacaoDisponivel(6,7,8, 2)">
@@ -201,10 +219,67 @@
                 </tr>
             </table>
         </div>
+
         <hr>
         <div class="footer">
-            <a href="index_o.html">A legdurvább okey helper ami nem portugálul van mostmár xd</a>
+            <a href="index_o.html">Metin2 Okey Helper</a>
         </div>
     </div>
+
+    <div id="sajat-pont-doboz">
+        <div style="margin-bottom:8px; font-weight:bold;">Saját Pontom:</div>
+        <input type="number" id="sajat-pont-input" value="0">
+        
+        <div style="margin: 15px auto; height: 80px; display:flex; align-items:center; justify-content:center;">
+             <img id="lada-kep" src="image_96b33a.png" style="max-height: 100%; max-width: 100%; object-fit: contain;">
+        </div>
+
+        <div id="lada-eredmeny" style="margin-top:5px; font-weight:bold; font-size:20px; color:#cd7f32;">
+            BRONZ láda
+        </div>
+        
+        <hr style="margin: 15px 0; border-color: #555;">
+        
+        <button class="reset-btn" onclick="location.reload()">
+            TÖRLÉS (ÚJ JÁTÉK)
+        </button>
+    </div>
+
+    <script>
+        // Ez biztosítja, hogy ha a HTML-ben van a doboz, akkor is működjön a képváltás
+        window.addEventListener('load', function() {
+            let inputMezo = document.getElementById("sajat-pont-input");
+            let eredmenyMezo = document.getElementById("lada-eredmeny");
+            let kepMezo = document.getElementById("lada-kep");
+            let doboz = document.getElementById("sajat-pont-doboz");
+
+            // Képek nevei (ellenőrizd, hogy a fájlok ott vannak-e a html mellett!)
+            const IMG_BRONZ = "image_96b33a.png";
+            const IMG_EZUST = "image_96b35a.png";
+            const IMG_ARANY = "image_96b37d.png";
+
+            // Ha valami változtatja az inputot (akár kézzel, akár a helper.js)
+            inputMezo.addEventListener("input", function() {
+                let pont = parseInt(this.value) || 0;
+                
+                if (pont >= 400) {
+                    eredmenyMezo.innerHTML = "ARANY láda";
+                    eredmenyMezo.style.color = "#ffd700"; 
+                    doboz.style.borderColor = "#ffd700";
+                    kepMezo.src = IMG_ARANY;
+                } else if (pont >= 300) {
+                    eredmenyMezo.innerHTML = "EZÜST láda";
+                    eredmenyMezo.style.color = "#c0c0c0"; 
+                    doboz.style.borderColor = "#c0c0c0";
+                    kepMezo.src = IMG_EZUST;
+                } else {
+                    eredmenyMezo.innerHTML = "BRONZ láda";
+                    eredmenyMezo.style.color = "#cd7f32"; 
+                    doboz.style.borderColor = "#cd7f32";
+                    kepMezo.src = IMG_BRONZ;
+                }
+            });
+        });
+    </script>
 </body>
 </html>

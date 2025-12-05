@@ -136,26 +136,14 @@ window.leadKombinaciot = function(tipus, p1, p2, p3, extraInfo) {
         cartas_descartadas[cor][p3-1] = true;
         pont = (p1 * 10) + 40; 
     } 
-    else if (tipus === 'vegyes_sor') { 
-        let lapok = [p1, p2, p3];
-        for(let val of lapok) {
-            for(let c=0; c<3; c++) {
-                if(!cartas_descartadas[c][val-1]) {
-                    cartas_descartadas[c][val-1] = true;
-                    break; 
-                }
-            }
-        }
-        pont = (p1 * 10);
-    }
     else if (tipus === 'szett') { // Szett (1-1-1)
         let val = p1;
-        // Kivesszük mindhárom színből
         cartas_descartadas[0][val-1] = true;
         cartas_descartadas[1][val-1] = true;
         cartas_descartadas[2][val-1] = true;
         pont = (val * 10) + 10;
     }
+    // A vegyes sorhoz nincs itt logika, mert nem kattintható!
     
     let input = document.getElementById("sajat-pont-input");
     let jelenlegi = parseInt(input.value) || 0;
@@ -317,23 +305,25 @@ function sajatPontKalkulatorLetrehozasa() {
     });
 }
 
-// --- FŐ LOGIKA: ÚJ SORREND ---
+// --- FŐ LOGIKA: VEGYES SOROK NEM KATTINTHATÓK ---
 function ellenorizdAPontokat() {
     let maxPontMaradek = 0;
     
+    // Alap stílus a kattintható gombokhoz
     let baseBtnStyle = "cursor:pointer; padding:6px 12px; margin:3px; display:inline-block; border-radius:6px; font-weight:bold; border:1px solid rgba(255,255,255,0.3); text-align:center; vertical-align:middle;";
     
     let html = "<h4 style='margin:0 0 10px 0; text-align:center; color:white;'>Még kirakható:</h4>";
 
     try {
-        // 0. Vegyes Sorok (1-2-3) - Ez marad felül (vagy elhagyható, ha zavar, de a pontszámítás miatt jobb ha itt van)
+        // 0. Vegyes Sorok (NEM KATTINTHATÓ, csak infó)
         let vanVegyes = false;
         let vegyesHtml = `<div style="border-bottom:1px solid #444; padding-bottom:5px; margin-bottom:5px;"><strong>Vegyes sorok:</strong><br>`;
         for (let i = 1; i <= 6; i++) {
              if (combinacaoDisponivel(i, i + 1, i + 2)) {
                 let pont = (i * 10);
                 maxPontMaradek += pont;
-                vegyesHtml += `<span style='${baseBtnStyle} background:#2e5e4e; color:white;' onclick='leadKombinaciot("vegyes_sor", ${i}, ${i+1}, ${i+2})'>
+                // Itt kivettem az onclick-et és a cursor:pointer-t!
+                vegyesHtml += `<span style='padding:6px 12px; margin:3px; display:inline-block; border-radius:6px; font-weight:bold; border:1px solid transparent; text-align:center; background:#2e5e4e; color:#eee; cursor:default; opacity:0.8;'>
                             ${i}-${i+1}-${i+2} <span style="font-size:0.8em; color:#bbb">(${pont}p)</span>
                          </span>`;
                 vanVegyes = true;
@@ -343,7 +333,7 @@ function ellenorizdAPontokat() {
         if(vanVegyes) html += vegyesHtml;
 
 
-        // 1. SZÍNES CSOPORTOK (KÉK, PIROS, SÁRGA) - FELSŐ RÉSZ
+        // 1. SZÍNES CSOPORTOK (KÉK, PIROS, SÁRGA)
         for (let c = 0; c < 3; c++) {
             let vanEbbenSzinben = false;
             let szinHtml = `<div style="border-bottom:1px solid #444; padding:5px 0; margin-bottom:5px;">`; 
@@ -363,14 +353,13 @@ function ellenorizdAPontokat() {
             if (vanEbbenSzinben) html += szinHtml;
         }
 
-        // 2. SZETTEK (1-1-1, 2-2-2) - EZ KERÜL ALULRA, A SÁRGA UTÁN
+        // 2. SZETTEK (ALULRA)
         let vanSzett = false;
         let szettHtml = `<div style="padding-top:5px;"><strong>Szettek:</strong><br>`;
         for (let i = 1; i <= 8; i++) {
             if (combinacaoDisponivel(i, i, i)) {
                 let pont = (i * 10) + 10;
                 maxPontMaradek += pont;
-                // Szürke/Semleges gomb
                 szettHtml += `<span style='${baseBtnStyle} background:#555; color:white;' onclick='leadKombinaciot("szett", ${i}, ${i}, ${i})'>
                             ${i}-${i}-${i} <span style="font-size:0.8em; color:#ddd">(${pont}p)</span>
                          </span>`;
@@ -378,7 +367,6 @@ function ellenorizdAPontokat() {
             }
         }
         szettHtml += "</div>";
-        // Csak akkor írjuk ki, ha van benne elem
         if(vanSzett) html += szettHtml;
 
 

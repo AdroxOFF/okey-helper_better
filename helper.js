@@ -330,4 +330,207 @@ function ellenorizdAPontokat() {
 
             for (let i = 1; i <= 6; i++) {
                 if (combinacaoDisponivel(i, i + 1, i + 2, c)) {
-                    let pont = (
+                    let pont = (i * 10) + 40;
+                    
+                    allCandidates.push({
+                        points: pont,
+                        cards: [{c:c, v:i}, {c:c, v:i+1}, {c:c, v:i+2}],
+                        name: `${SZIN_NEVEK[c]} ${i}-${i+2}`
+                    });
+
+                    szinHtml += `<span style='${baseBtnStyle} ${CSS_BTN_SZINEK[c]}' onclick='leadKombinaciot("szin_sor", ${i}, ${i+1}, ${i+2}, ${c})'>
+                                        ${i}-${i+1}-${i+2} <span style="font-size:0.8em; opacity:0.8">(${pont}p)</span>
+                                     </span>`;
+                    vanEbbenSzinben = true;
+                }
+            }
+            szinHtml += `</div>`;
+            if (vanEbbenSzinben) html += szinHtml;
+        }
+
+        // 2. SZETTEK
+        let vanSzett = false;
+        let szettHtml = `<div style="padding-top:5px;"><strong>Szettek:</strong><br>`;
+        for (let i = 1; i <= 8; i++) {
+            if (combinacaoDisponivel(i, i, i)) {
+                let pont = (i * 10) + 10;
+                
+                allCandidates.push({
+                    points: pont,
+                    cards: [{c:0, v:i}, {c:1, v:i}, {c:2, v:i}],
+                    name: `Szett ${i}`
+                });
+
+                szettHtml += `<span style='${baseBtnStyle} background:#555; color:white;' onclick='leadKombinaciot("szett", ${i}, ${i}, ${i})'>
+                            ${i}-${i}-${i} <span style="font-size:0.8em; color:#ddd">(${pont}p)</span>
+                         </span>`;
+                vanSzett = true;
+            }
+        }
+        szettHtml += "</div>";
+        if(vanSzett) html += szettHtml;
+
+        // --- OPTIMALIZÁLÁS FUTTATÁSA ---
+        
+        let resultObj = calculateMaxDisjointScore(allCandidates, new Set());
+        let realMaxPoints = resultObj.score;
+        let bestMoves = resultObj.moves;
+
+        // --- UI FRISSÍTÉS ---
+        let tablazat = document.getElementById("kombinacio-tablazat");
+        if (tablazat) tablazat.innerHTML = html;
+
+        if (allCandidates.length === 0) nincsTobbLehetoseg = true;
+        else nincsTobbLehetoseg = false;
+
+        // --- JOBB FELSŐ KIJELZŐ ---
+        let kijelzo = document.getElementById("pont-kijelzo");
+        let sajatPont = parseInt(document.getElementById("sajat-pont-input").value) || 0;
+        let osszesPotencial = sajatPont + realMaxPoints;
+
+        if (kijelzo) {
+            kijelzo.style.display = "none"; 
+            
+            // Akkor is mutassa, ha van még lehetőség, vagy ha már van pontunk
+            if (!nincsTobbLehetoseg || osszesPotencial > 0) {
+                let statuszText = "";
+                let statuszColor = "white";
+
+                if (osszesPotencial >= 400) {
+                    statuszText = "ARANY 🏆";
+                    statuszColor = "#ffd700";
+                } 
+                else if (osszesPotencial >= 300) {
+                    statuszText = "EZÜST 🥈";
+                    statuszColor = "#c0c0c0";
+                } else {
+                    statuszText = "BRONZ 🥉";
+                    statuszColor = "#cd7f32";
+                }
+
+                // Kalkuláció részletezése
+                let reszletek = "";
+                if (bestMoves.length > 0) {
+                    reszletek = "<div style='margin-top:5px; font-size:12px; text-align:right; color:#ddd; border-top:1px solid #555; padding-top:3px;'>";
+                    bestMoves.forEach(m => {
+                        reszletek += `+ ${m.name} <span style="color:#aaa">(${m.points})</span><br>`;
+                    });
+                    reszletek += "</div>";
+                }
+
+                kijelzo.style.display = "block";
+                kijelzo.style.borderColor = statuszColor;
+                kijelzo.style.color = statuszColor;
+                
+                kijelzo.innerHTML = `
+                    <div style="font-size:18px; margin-bottom:2px; text-align:right;">${statuszText}</div>
+                    <div style="font-size:14px; color:white; text-align:right;">Max pont: ${osszesPotencial}</div>
+                    ${reszletek}
+                `;
+            }
+        }
+
+    } catch (e) { console.error("Hiba az ellenorizdAPontokat-ban:", e); }
+}
+
+// =============================================================
+// UI ELEMEK LÉTREHOZÁSA (INJEKTÁLÁS)
+// =============================================================
+
+function kijelzoLetrehozasa() {
+    if (document.getElementById("pont-kijelzo")) return;
+    let div = document.createElement("div");
+    div.id = "pont-kijelzo";
+    div.style.position = "fixed";
+    div.style.top = "10px";
+    div.style.right = "10px";
+    div.style.backgroundColor = "rgba(0,0,0,0.9)";
+    div.style.color = "white";
+    div.style.padding = "10px 15px";
+    div.style.borderRadius = "8px";
+    div.style.fontFamily = "Arial, sans-serif";
+    div.style.fontWeight = "bold";
+    div.style.border = "2px solid white";
+    div.style.zIndex = "9999";
+    div.innerHTML = "...";
+    document.body.appendChild(div);
+}
+
+function tablazatLetrehozasa() {
+    if (document.getElementById("kombinacio-tablazat")) return;
+    let div = document.createElement("div");
+    div.id = "kombinacio-tablazat";
+    div.style.position = "fixed";
+    div.style.top = "10px";
+    div.style.left = "10px";
+    div.style.backgroundColor = "rgba(0,0,0,0.95)";
+    div.style.color = "white";
+    div.style.padding = "10px";
+    div.style.borderRadius = "8px";
+    div.style.fontFamily = "Arial, sans-serif"; 
+    div.style.fontSize = "15px"; 
+    div.style.border = "1px solid #777";
+    div.style.zIndex = "9999";
+    div.style.maxWidth = "480px"; 
+    div.style.maxHeight = "90vh"; 
+    div.style.overflowY = "auto";
+    div.innerHTML = "Betöltés...";
+    document.body.appendChild(div);
+}
+
+function sajatPontKalkulatorLetrehozasa() {
+    if (document.getElementById("sajat-pont-doboz")) return;
+
+    let div = document.createElement("div");
+    div.id = "sajat-pont-doboz";
+    div.style.position = "fixed";
+    div.style.bottom = "20px";
+    div.style.right = "20px";
+    div.style.backgroundColor = "rgba(0,0,0,0.9)";
+    div.style.color = "white";
+    div.style.padding = "15px";
+    div.style.borderRadius = "10px";
+    div.style.fontFamily = "Arial, sans-serif";
+    div.style.border = "2px solid #aaa";
+    div.style.zIndex = "9999";
+    div.style.textAlign = "center";
+    div.style.minWidth = "200px";
+
+    div.innerHTML = `
+        <div style="margin-bottom:8px; font-weight:bold;">Saját Pontom:</div>
+        <input type="number" id="sajat-pont-input" style="width:80px; padding:5px; font-size:24px; text-align:center; border-radius:5px; border:none;" value="0">
+        <div id="lada-eredmeny" style="margin-top:10px; font-weight:bold; font-size:20px; color:#cd7f32;">
+            BRONZ
+        </div>
+        
+        <hr style="margin: 15px 0; border-color: #555;">
+        
+        <button onclick="location.reload()" style="background-color: #c9302c; color: white; border: none; padding: 10px 20px; font-size: 14px; font-weight: bold; border-radius: 5px; cursor: pointer; width: 100%;">
+            TÖRLÉS (ÚJ JÁTÉK)
+        </button>
+    `;
+
+    document.body.appendChild(div);
+
+    let inputMezo = document.getElementById("sajat-pont-input");
+    let eredmenyMezo = document.getElementById("lada-eredmeny");
+
+    inputMezo.addEventListener("input", function() {
+        let pont = parseInt(this.value) || 0;
+        
+        if (pont >= 400) {
+            eredmenyMezo.innerHTML = "ARANY láda";
+            eredmenyMezo.style.color = "#ffd700"; 
+            div.style.border = "2px solid #ffd700";
+        } else if (pont >= 300) {
+            eredmenyMezo.innerHTML = "EZÜST láda";
+            eredmenyMezo.style.color = "#c0c0c0"; 
+            div.style.border = "2px solid #c0c0c0";
+        } else {
+            eredmenyMezo.innerHTML = "BRONZ láda";
+            eredmenyMezo.style.color = "#cd7f32"; 
+            div.style.border = "2px solid #cd7f32";
+        }
+        ellenorizdAPontokat(); 
+    });
+}

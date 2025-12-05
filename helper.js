@@ -15,15 +15,17 @@ let historico = {
     dados: []
 };
 
-let cartas_descartadas = [];
+let cartas_descartadas = []; // Ezek már kimentek (Szürke)
+let kijelolt_kartyak = [];   // Ezeket most jelölted ki (Zöld)
 let jatekVege = false;
 
 // --- INDÍTÁS ---
 function setup() {
-    // Kijelzők létrehozása
-    kijelzoLetrehozasa();       // Jobb felül: Max pont
-    tablazatLetrehozasa();      // Bal felül: Kombinációk
-    sajatPontKalkulatorLetrehozasa(); // ÚJ: Jobb alul: Saját pont/Láda
+    // 1. Kijelzők létrehozása
+    kijelzoLetrehozasa();       
+    tablazatLetrehozasa();      
+    sajatPontKalkulatorLetrehozasa(); 
+    gombokLetrehozasa(); // ÚJ: Vezérlő gombok
 
     iniciarJogo();
 
@@ -41,7 +43,6 @@ function setup() {
         });
     }
 
-    // --- ITT NÖVELTEM MEG A SZÉLESSÉGET 950-RE ---
     let canvasWidth = 950; 
     let canvasHeight = ((canvasWidth/8) * RA_CARTA) * 3 + 1;
     let canvas = createCanvas(canvasWidth, canvasHeight);
@@ -50,6 +51,7 @@ function setup() {
 
 function iniciarJogo() {
     cartas_descartadas = [];
+    kijelolt_kartyak = [];
     for (let cor = 0; cor < 3; cor++) {
         cartas_descartadas.push([]);
         for (let carta = 0; carta < 8; carta++) {
@@ -74,10 +76,21 @@ function draw() {
             let x = LARGURA_CARTA * (carta - 1);
             let y = ALTURA_CARTA * cor;
         
+            // Alap kártya
             fill(CORES[cor]);
-            if (cartas_descartadas[cor][carta - 1]) fill(70); 
+            
+            // Ha már eldobták (Végleges)
+            if (cartas_descartadas[cor][carta - 1]) fill(50); 
+            
             stroke(0);
             strokeWeight(1);
+            
+            // Ha KI VAN JELÖLVE (Zöld keret)
+            if (isKijelolve(cor, carta)) {
+                stroke(0, 255, 0); // Zöld
+                strokeWeight(5);
+            }
+
             rect(x, y, LARGURA_CARTA, ALTURA_CARTA);
 
             let centroX = x + (LARGURA_CARTA / 2);
@@ -85,12 +98,13 @@ function draw() {
 
             fill(255);
             textAlign(CENTER, CENTER);
-            textSize(28); // Kicsit nagyobb betűméret a szélesebb kártyákhoz
+            textSize(28); 
             stroke(0);
             strokeWeight(3);
             text(carta, centroX, centroY);
 
-            if (jatekVege && !cartas_descartadas[cor][carta - 1]) {
+            // Game Over X
+            if (jatekVege && !cartas_descartadas[cor][carta - 1] && !isKijelolve(cor, carta)) {
                 stroke(255, 0, 0);
                 strokeWeight(5);
                 line(x, y, x + LARGURA_CARTA, y + ALTURA_CARTA);
@@ -98,6 +112,14 @@ function draw() {
             }
         }
     }
+}
+
+// Segédfüggvény: Benne van-e a kijelöltek között?
+function isKijelolve(cor, carta) {
+    for(let k of kijelolt_kartyak) {
+        if (k.cor === cor && k.carta === carta) return true;
+    }
+    return false;
 }
 
 function mousePressed() {
@@ -112,17 +134,163 @@ function mousePressed() {
         let carta = (x % 8) + 1;
 
         if (cor >= 0 && cor < 3 && carta >= 1 && carta <= 8) {
-            if (!cartas_descartadas[cor][carta - 1]) {
-                 cartas_descartadas[cor][carta - 1] = true;
-                 adicionarAoHistorico();
-                 if (window.app) app.a++;
-                 ellenorizdAPontokat();
+            // Ha már eldobott (szürke), nem csinálunk semmit
+            if (cartas_descartadas[cor][carta - 1]) return;
+
+            // KIJELÖLÉS LOGIKA
+            if (isKijelolve(cor, carta)) {
+                // Ha már ki volt jelölve, vegyük le a kijelölést
+                kijelolt_kartyak = kijelolt_kartyak.filter(k => !(k.cor === cor && k.carta === carta));
+            } else {
+                // Ha még nincs, adjuk hozzá
+                if (kijelolt_kartyak.length < 3) { // Max 3-at engedjünk egyszerre (opcionális)
+                     kijelolt_kartyak.push({cor: cor, carta: carta});
+                } else {
+                    // Ha már 3 van, a legrégebbit kivesszük, és berakjuk az újat (hogy gördülékeny legyen)
+                    kijelolt_kartyak.shift();
+                    kijelolt_kartyak.push({cor: cor, carta: carta});
+                }
             }
         }
     }
 }
 
-// --- LOGIKA ---
+// --- ÚJ GOMBOK VEZÉRLÉSE ---
+
+function gombokLetrehozasa() {
+    if (document.getElementById("vezerlo-gombok")) return;
+
+    let container = document.createElement("div");
+    container.id = "vezerlo-gombok";
+    container.style.position = "fixed";
+    container.style.bottom = "20px";
+    container.style.left = "50%";
+    container.style.transform = "translateX(-50%)";
+    container.style.display = "flex";
+    container.style.gap = "20px";
+    container.style.zIndex = "9999";
+
+    // GOMB 1: Kombináció Lerakása
+    let btnLerakas = document.createElement("button");
+    btnLerakas.innerHTML = "✅ Kombináció Lerakása";
+    btnLerakas.style.padding = "15px 25px";
+    btnLerakas.style.fontSize = "18px";
+    btnLerakas.style.fontWeight = "bold";
+    btnLerakas.style.backgroundColor = "#28a745"; // Zöld
+    btnLerakas.style.color = "white";
+    btnLerakas.style.border = "none";
+    btnLerakas.style.borderRadius = "8px";
+    btnLerakas.style.cursor = "pointer";
+    btnLerakas.onclick = function() {
+        if (kijelolt_kartyak.length !== 3) {
+            alert("Kérlek jelölj ki pontosan 3 kártyát a kombinációhoz!");
+            return;
+        }
+        feldolgozKombinacio();
+    };
+
+    // GOMB 2: Eldobás (Kuka)
+    let btnEldobas = document.createElement("button");
+    btnEldobas.innerHTML = "🗑️ Eldobás (Kuka)";
+    btnEldobas.style.padding = "15px 25px";
+    btnEldobas.style.fontSize = "18px";
+    btnEldobas.style.fontWeight = "bold";
+    btnEldobas.style.backgroundColor = "#dc3545"; // Piros
+    btnEldobas.style.color = "white";
+    btnEldobas.style.border = "none";
+    btnEldobas.style.borderRadius = "8px";
+    btnEldobas.style.cursor = "pointer";
+    btnEldobas.onclick = function() {
+        if (kijelolt_kartyak.length === 0) {
+            alert("Nincs kijelölve kártya!");
+            return;
+        }
+        veglegesitEldobas();
+    };
+
+    container.appendChild(btnLerakas);
+    container.appendChild(btnEldobas);
+    document.body.appendChild(container);
+}
+
+// --- PONT SZÁMÍTÁSI LOGIKA ---
+
+function feldolgozKombinacio() {
+    // 1. Kártyák sorbarendezése érték szerint
+    let k = kijelolt_kartyak.sort((x, y) => x.carta - y.carta);
+    
+    let a = k[0].carta;
+    let b = k[1].carta;
+    let c = k[2].carta;
+    
+    let pont = 0;
+    let valid = false;
+    let uzenet = "";
+
+    // ESET A: Egyforma számok (SZETT) - pl. 1-1-1
+    if (a === b && b === c) {
+        // Ellenőrizzük, hogy különböző színek-e
+        let szinek = [k[0].cor, k[1].cor, k[2].cor].sort();
+        // A te szabályaid szerint a szett lehet 20, 30...90 pont
+        // Függetlenül attól hogy milyen színek, ha 3 egyforma szám van, az érvényes
+        pont = (a * 10) + 10; 
+        valid = true;
+        uzenet = "Szett (+ " + pont + " pont)";
+    }
+    // ESET B: Sorozat (SOR) - pl. 1-2-3
+    else if (a + 1 === b && b + 1 === c) {
+        // Megnézzük a színeket
+        let szinA = k[0].cor;
+        let szinB = k[1].cor;
+        let szinC = k[2].cor;
+
+        if (szinA === szinB && szinB === szinC) {
+            // AZONOS SZÍNŰ SOR
+            pont = (a * 10) + 40; // pl 1-2-3 = 50 pont
+            valid = true;
+            uzenet = "Színes Sor (+ " + pont + " pont)";
+        } else {
+            // VEGYES SZÍNŰ SOR
+            pont = (a * 10); // pl 1-2-3 = 10 pont
+            valid = true;
+            uzenet = "Vegyes Sor (+ " + pont + " pont)";
+        }
+    }
+
+    if (valid) {
+        // Pont hozzáadása a számlálóhoz
+        hozzaadPontot(pont);
+        // Alert helyett Console log vagy kis értesítés
+        console.log(uzenet); 
+        // Kártyák véglegesítése
+        veglegesitEldobas();
+    } else {
+        alert("Ez nem érvényes kombináció! (Sem szett, sem sor)");
+    }
+}
+
+function hozzaadPontot(pont) {
+    let input = document.getElementById("sajat-pont-input");
+    let jelenlegi = parseInt(input.value) || 0;
+    input.value = jelenlegi + pont;
+    // Triggereljük az eseményt, hogy a láda színe frissüljön
+    input.dispatchEvent(new Event('input'));
+}
+
+function veglegesitEldobas() {
+    // Átrakjuk a kijelölteket a 'cartas_descartadas' tömbbe
+    for (let k of kijelolt_kartyak) {
+        cartas_descartadas[k.cor][k.carta - 1] = true;
+    }
+    // Töröljük a kijelölést
+    kijelolt_kartyak = [];
+    
+    adicionarAoHistorico();
+    if (window.app) app.a++;
+    ellenorizdAPontokat(); // Újraszámolja a maradék lehetőségeket
+}
+
+// --- LOGIKA (UNDO/HISTORY) ---
 function limpar() {
     historico.pos = 1;
     desfazer();
@@ -141,6 +309,7 @@ function refazer() {
 function carregarDoHistorico(pos) {
     let dados = JSON.parse(JSON.stringify(historico.dados[pos]));
     cartas_descartadas = dados.cartas_descartadas;
+    kijelolt_kartyak = []; // History töltéskor töröljük a kijelölést
     if (window.app) app.a++;
     ellenorizdAPontokat();
 }
@@ -179,7 +348,6 @@ function combinacaoDisponivel(a, b, c, cor = -1) {
 
 // --- KIJELZŐK ---
 
-// 1. Jobb felső: Max pontszám
 function kijelzoLetrehozasa() {
     if (document.getElementById("pont-kijelzo")) return;
     let div = document.createElement("div");
@@ -199,7 +367,6 @@ function kijelzoLetrehozasa() {
     document.body.appendChild(div);
 }
 
-// 2. Bal felső: Kombinációk
 function tablazatLetrehozasa() {
     if (document.getElementById("kombinacio-tablazat")) return;
     let div = document.createElement("div");
@@ -220,7 +387,6 @@ function tablazatLetrehozasa() {
     document.body.appendChild(div);
 }
 
-// 3. ÚJ: Jobb alsó: Saját Pont / Láda Kalkulátor
 function sajatPontKalkulatorLetrehozasa() {
     if (document.getElementById("sajat-pont-doboz")) return;
 
@@ -239,10 +405,9 @@ function sajatPontKalkulatorLetrehozasa() {
     div.style.textAlign = "center";
     div.style.minWidth = "200px";
 
-    // HTML tartalom: Beviteli mező és Eredmény
     div.innerHTML = `
         <div style="margin-bottom:8px; font-weight:bold;">Saját Pontom:</div>
-        <input type="number" id="sajat-pont-input" style="width:80px; padding:5px; font-size:18px; text-align:center; border-radius:5px; border:none;" placeholder="0">
+        <input type="number" id="sajat-pont-input" style="width:80px; padding:5px; font-size:18px; text-align:center; border-radius:5px; border:none;" value="0">
         <div id="lada-eredmeny" style="margin-top:10px; font-weight:bold; font-size:18px; color:#cd7f32;">
             Vidám BRONZ láda
         </div>
@@ -250,7 +415,6 @@ function sajatPontKalkulatorLetrehozasa() {
 
     document.body.appendChild(div);
 
-    // Eseményfigyelő: Ha írnak a mezőbe, frissüljön a szöveg
     let inputMezo = document.getElementById("sajat-pont-input");
     let eredmenyMezo = document.getElementById("lada-eredmeny");
 
@@ -259,15 +423,15 @@ function sajatPontKalkulatorLetrehozasa() {
         
         if (pont >= 400) {
             eredmenyMezo.innerHTML = "Vidám ARANY láda";
-            eredmenyMezo.style.color = "#ffd700"; // Arany
+            eredmenyMezo.style.color = "#ffd700"; 
             div.style.border = "2px solid #ffd700";
         } else if (pont >= 300) {
             eredmenyMezo.innerHTML = "Vidám EZÜST láda";
-            eredmenyMezo.style.color = "#c0c0c0"; // Ezüst
+            eredmenyMezo.style.color = "#c0c0c0"; 
             div.style.border = "2px solid #c0c0c0";
         } else {
             eredmenyMezo.innerHTML = "Vidám BRONZ láda";
-            eredmenyMezo.style.color = "#cd7f32"; // Bronz
+            eredmenyMezo.style.color = "#cd7f32"; 
             div.style.border = "2px solid #cd7f32";
         }
     });

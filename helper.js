@@ -1,109 +1,97 @@
-var RA_CARTA = 1.39; // Relação de aspeto da carta (64:89)
-var CORES = [
+const RA_CARTA = 1.39 // Relação de aspeto da carta (64:89)
+const CORES = [
     [35, 85, 172], // Kék
     [163, 12, 19], // Piros
     [225, 182, 21] // Sárga
-];
+]
 
-var CSS_SZINEK = ["#4da6ff", "#ff4d4d", "#ffd700"];
-var SZIN_NEVEK = ["Kék", "Piros", "Sárga"];
-
-var historico = {
+let historico = {
     pos: -1,
     dados: []
-};
+}
 
-var cartas_descartadas = [];
-var jatekVege = false;
+let cartas_descartadas = []       // Cartas que já foram utilizadas
+let jatekVege = false; 
 
 function iniciarJogo() {
-    cartas_descartadas = [];
-    for (var cor = 0; cor < 3; cor++) {
-        cartas_descartadas.push([]);
-        for (var carta = 0; carta < 8; carta++) {
-            cartas_descartadas[cor].push(false);
-        }
+    for (let cor = 0; cor < 3; cor++) {
+        cartas_descartadas.push([])
+        for (let carta = 0; carta < 8; carta++)
+        cartas_descartadas[cor].push(false)
     }
     
-    jatekVege = false;
-    adicionarAoHistorico();
-    // Csak akkor számolunk, ha már létezik a kijelző
-    setTimeout(ellenorizdAPontokat, 100); 
+    jatekVege = false; 
+    adicionarAoHistorico()
+    ellenorizdAPontokat(); 
 }
 
 function setup() {
-    // Kijelzők létrehozása LEGFELÜL, hogy biztosan meglegyenek
-    kijelzoLetrehozasa();
-    tablazatLetrehozasa();
-
-    // Hóesés effekt (opcionális)
-    var d = new Date();
+    // Add snow
+    let d = new Date()
     if (d.getMonth() > 10 || d.getMonth() < 2) {
-        var head = document.querySelector('head');
-        var script = document.createElement('script');
-        script.src = 'snow.js';
-        script.type = 'text/javascript';
-        head.appendChild(script);
+        let head = document.querySelector('head')
+        let script = document.createElement('script')
+        script.src = 'snow.js'
+        script.type = 'text/javascript'
+        head.appendChild(script)
     }
 
-    iniciarJogo();
+    iniciarJogo()
+    
+    // --- ÚJ: Kijelző létrehozása az oldal betöltésekor ---
+    kijelzoLetrehozasa();
 
-    // Vue.js inicializálás
     window.app = new Vue({
         el: '#app',
         data: {
             a: 0
         },
         methods: {
-            combinacaoDisponivel: function(a, b, c, d) {
-                if (d === undefined) d = -1;
-                this.a;
-                return combinacaoDisponivel(a, b, c, d);
+            combinacaoDisponivel(a, b, c, d=-1) {
+                this.a
+                return combinacaoDisponivel(a, b, c, d)
             }
         }
-    });
+    })
 
-    // Canvas létrehozása
-    var canvas = createCanvas(750, ((750/8) * RA_CARTA) * 3 + 1);
-    canvas.parent('game');
+    let canvas = createCanvas(750, ((750/8) * RA_CARTA) * 3 +1)
+    canvas.parent('game')
 }
 
 function draw() {
-    clear();
+    clear()
     
-    var LARGURA_CARTA = width / 8;
-    var ALTURA_CARTA = LARGURA_CARTA * RA_CARTA;
+    let LARGURA_CARTA = width/8
+    let ALTURA_CARTA = LARGURA_CARTA * RA_CARTA
+    for (let cor = 0; cor < 3; cor++) {
 
-    for (var cor = 0; cor < 3; cor++) {
-        for (var carta = 1; carta <= 8; carta++) {
-            var x = LARGURA_CARTA * (carta - 1);
-            var y = ALTURA_CARTA * cor;
+        for (let carta = 1; carta <= 8; carta++) {
+            let x, y
+            x = LARGURA_CARTA * (carta-1)
+            y = ALTURA_CARTA * cor;
         
-            fill(CORES[cor]);
-            
-            // Ha ki van választva, legyen szürke
-            if (cartas_descartadas[cor][carta - 1]) {
-                fill(70);
+            fill(CORES[cor])
+            if (cartas_descartadas[cor][carta-1]) fill(70) // Szürke, ha kiválasztva
+
+            stroke(0)
+            strokeWeight(1)
+            rect(x, y, LARGURA_CARTA, ALTURA_CARTA)
+
+            let centro = {
+                x: x + (LARGURA_CARTA / 2),
+                y: y + (ALTURA_CARTA / 2)
             }
 
-            stroke(0);
-            strokeWeight(1);
-            rect(x, y, LARGURA_CARTA, ALTURA_CARTA);
+            fill(255)
+            textAlign(CENTER, CENTER)
+            textSize(24)
+            stroke(0)
+            strokeWeight(3)
+            text(carta, centro.x, centro.y)
 
-            // Számok
-            var centroX = x + (LARGURA_CARTA / 2);
-            var centroY = y + (ALTURA_CARTA / 2);
-
-            fill(255);
-            textAlign(CENTER, CENTER);
-            textSize(24);
-            stroke(0);
-            strokeWeight(3);
-            text(carta, centroX, centroY);
-
-            // Piros X, ha vége a játéknak és a kártya még nincs kiválasztva
-            if (jatekVege && !cartas_descartadas[cor][carta - 1]) {
-                stroke(255, 0, 0);
+            // Piros X rajzolása, ha már nincs meg a 300 pont
+            if (jatekVege && !cartas_descartadas[cor][carta-1]) {
+                stroke(255, 0, 0); 
                 strokeWeight(5);
                 line(x, y, x + LARGURA_CARTA, y + ALTURA_CARTA);
                 line(x + LARGURA_CARTA, y, x, y + ALTURA_CARTA);
@@ -112,173 +100,163 @@ function draw() {
     }
 }
 
-function mousePressed() {
-    if (mouseX < 0 || mouseX > width || mouseY < 0 || mouseY > height) return;
 
-    var LARGURA_CARTA = width / 8;
-    var ALTURA_CARTA = LARGURA_CARTA * RA_CARTA;
+function mousePressed() {
+    if (mouseX < 0 || mouseX > width || mouseY < 0 || mouseY > height)
+        return
+
+    let LARGURA_CARTA = width / 8
+    let ALTURA_CARTA = LARGURA_CARTA * RA_CARTA
 
     if (mouseY < ALTURA_CARTA * 3) {
-        var cor = Math.floor(mouseY / (height / 3));
-        var x = Math.floor(mouseX / LARGURA_CARTA);
-        var carta = (x % 8) + 1;
+        let cor = ~~(mouseY / (height/3)) 
+        
+        let x = floor(mouseX / LARGURA_CARTA)
+        let carta = x % 8 + 1
 
-        // Hibakezelés, ha véletlen rossz helyre kattintanánk
-        if (cor >= 0 && cor < 3 && carta >= 1 && carta <= 8) {
-            if (!cartas_descartadas[cor][carta - 1]) {
-                 cartas_descartadas[cor][carta - 1] = true;
-                 adicionarAoHistorico();
-                 app.a++;
-                 ellenorizdAPontokat();
-            }
+        if (!cartas_descartadas[cor][carta-1]) {
+             cartas_descartadas[cor][carta-1] = true
+             adicionarAoHistorico()
+             app.a++
+             ellenorizdAPontokat() 
         }
     }
 }
 
 function limpar() {
-    historico.pos = 1;
-    desfazer();
+    historico.pos = 1
+    desfazer()
 }
 
 function desfazer() {
-    if (historico.pos < 1) return;
-    carregarDoHistorico(--historico.pos);
+    if (historico.pos < 1)
+        return
+
+    carregarDoHistorico(--historico.pos)
 }
 
 function refazer() {
-    if (historico.pos >= historico.dados.length - 1) return;
-    carregarDoHistorico(++historico.pos);
+    if (historico.pos >= historico.dados.length - 1)
+        return
+    
+    carregarDoHistorico(++historico.pos)
 }
 
 function carregarDoHistorico(pos) {
-    var dados = JSON.parse(JSON.stringify(historico.dados[pos]));
-    cartas_descartadas = dados.cartas_descartadas;
-    app.a++;
-    ellenorizdAPontokat();
+    let dados = JSON.parse(JSON.stringify(historico.dados[pos]))
+
+    cartas_descartadas = dados.cartas_descartadas
+    app.a++
+    ellenorizdAPontokat() 
 }
 
 function adicionarAoHistorico() {
-    if (historico.pos + 1 < historico.dados.length) {
-        historico.dados.splice(historico.pos + 1, historico.dados.length - historico.pos);
-    }
+    if (historico.pos + 1 < historico.dados.length)
+        historico.dados.splice(historico.pos + 1, historico.dados.length - historico.pos)
     
-    historico.dados.push(JSON.parse(JSON.stringify({ cartas_descartadas: cartas_descartadas })));
-    historico.pos++;
+    historico.dados.push(
+        JSON.parse(
+            JSON.stringify(
+                {
+                    cartas_descartadas
+                }
+            )
+        )
+    )
+
+    historico.pos++
 }
 
 function cartaDisponivel(carta, cor) {
-    return !cartas_descartadas[cor][carta - 1];
+    return !cartas_descartadas[cor][carta-1]
 }
 
-function combinacaoDisponivel(a, b, c, cor) {
-    if (cor === undefined) cor = -1;
-    
-    var ord = [a, b, c].sort();
-    a = ord[0];
-    b = ord[1];
-    c = ord[2];
+
+function combinacaoDisponivel(a, b, c, cor=-1) {
+    let ord = [a, b, c].sort()
+    a = ord[0]
+    b = ord[1]
+    c = ord[2]
 
     if (a == b && b == c) {
-        return cartaDisponivel(a, 0) && cartaDisponivel(a, 1) && cartaDisponivel(a, 2);
+        return cartaDisponivel(a, 0) && cartaDisponivel(a, 1) && cartaDisponivel(a, 2)
     }
 
     if (a + 1 == b && b + 1 == c) {
         if (cor == -1) {
-            return (cartaDisponivel(a, 0) || cartaDisponivel(a, 1) || cartaDisponivel(a, 2)) &&
-                   (cartaDisponivel(b, 0) || cartaDisponivel(b, 1) || cartaDisponivel(b, 2)) &&
-                   (cartaDisponivel(c, 0) || cartaDisponivel(c, 1) || cartaDisponivel(c, 2));
+            return (cartaDisponivel(a, 0) || cartaDisponivel(a, 1) || cartaDisponivel(a, 2)) 
+                && (cartaDisponivel(b, 0) || cartaDisponivel(b, 1) || cartaDisponivel(b, 2))
+                && (cartaDisponivel(c, 0) || cartaDisponivel(c, 1) || cartaDisponivel(c, 2))
         }
-        return cartaDisponivel(a, cor) && cartaDisponivel(b, cor) && cartaDisponivel(c, cor);
+        return cartaDisponivel(a, cor) && cartaDisponivel(b, cor) && cartaDisponivel(c, cor)
     }
     return false;
 }
 
-// --- KIJELZŐK (Egyszerűsített stílus) ---
+// --- ÚJ FUNKCIÓ: Létrehozza a vizuális ablakot a jobb felső sarokban ---
 function kijelzoLetrehozasa() {
-    var div = document.createElement("div");
+    let div = document.createElement("div");
     div.id = "pont-kijelzo";
+    // Stílus beállítások (Fekete háttér, fehér szöveg, jobb felül fixen)
     div.style.position = "fixed";
-    div.style.top = "10px";
-    div.style.right = "10px";
-    div.style.backgroundColor = "rgba(0,0,0,0.9)";
+    div.style.top = "20px";
+    div.style.right = "20px";
+    div.style.backgroundColor = "rgba(0, 0, 0, 0.85)";
     div.style.color = "white";
-    div.style.padding = "10px";
-    div.style.borderRadius = "8px";
-    div.style.fontFamily = "Arial";
+    div.style.padding = "15px 25px";
+    div.style.borderRadius = "12px";
+    div.style.fontFamily = "Arial, sans-serif";
+    div.style.fontSize = "22px";
     div.style.fontWeight = "bold";
-    div.style.border = "2px solid gold";
-    div.style.zIndex = "1000";
+    div.style.border = "3px solid #ffd700"; // Arany keret
+    div.style.boxShadow = "0 4px 8px rgba(0,0,0,0.5)";
+    div.style.zIndex = "9999"; // Hogy biztosan minden felett legyen
     div.innerHTML = "Számolás...";
+    
     document.body.appendChild(div);
 }
 
-function tablazatLetrehozasa() {
-    var div = document.createElement("div");
-    div.id = "kombinacio-tablazat";
-    div.style.position = "fixed";
-    div.style.top = "10px";
-    div.style.left = "10px";
-    div.style.backgroundColor = "rgba(0,0,0,0.9)";
-    div.style.color = "white";
-    div.style.padding = "10px";
-    div.style.borderRadius = "8px";
-    div.style.fontFamily = "monospace";
-    div.style.border = "1px solid #555";
-    div.style.zIndex = "1000";
-    div.style.maxWidth = "300px";
-    div.innerHTML = "Betöltés...";
-    document.body.appendChild(div);
-}
-
+// --- MÓDOSÍTOTT SZÁMOLÓ: Kiírja az eredményt az ablakba ---
 function ellenorizdAPontokat() {
-    var maxPont = 0;
-    var html = "<h4 style='margin:0 0 10px 0'>Még kirakható:</h4>";
+    let maxPont = 0;
 
     // 1. SZETTEK
-    for (var i = 1; i <= 8; i++) {
+    for (let i = 1; i <= 8; i++) {
         if (combinacaoDisponivel(i, i, i)) {
-            maxPont += (i * 10) + 10;
+            maxPont += (i * 10) + 10; 
         }
     }
 
-    // 2. VEGYES SZÍN
-    for (var i = 1; i <= 6; i++) {
-        if (combinacaoDisponivel(i, i + 1, i + 2)) {
-            maxPont += (i * 10);
+    // 2. VEGYES SZÍNŰ SOROK
+    for (let i = 1; i <= 6; i++) {
+        if (combinacaoDisponivel(i, i+1, i+2)) { 
+            maxPont += (i * 10); 
         }
     }
 
-    // 3. AZONOS SZÍN (Táblázat építése hagyományos módszerrel)
-    for (var c = 0; c < 3; c++) {
-        html += "<div style='color:" + CSS_SZINEK[c] + "'><strong>" + SZIN_NEVEK[c] + ": </strong>";
-        var vanSor = false;
-        
-        for (var i = 1; i <= 6; i++) {
-            if (combinacaoDisponivel(i, i + 1, i + 2, c)) {
-                maxPont += (i * 10) + 40;
-                html += " [" + i + "-" + (i + 1) + "-" + (i + 2) + "] ";
-                vanSor = true;
+    // 3. AZONOS SZÍNŰ SOROK
+    for (let c = 0; c < 3; c++) { 
+        for (let i = 1; i <= 6; i++) { 
+            if (combinacaoDisponivel(i, i+1, i+2, c)) {
+                maxPont += (i * 10) + 40; 
             }
         }
-        
-        if (!vanSor) html += " - ";
-        html += "</div>";
     }
 
-    // Frissítés
-    var tablazat = document.getElementById("kombinacio-tablazat");
-    if (tablazat) tablazat.innerHTML = html;
-
-    var kijelzo = document.getElementById("pont-kijelzo");
+    // --- FRISSÍTJÜK A KIJELZŐT ---
+    let kijelzo = document.getElementById("pont-kijelzo");
     if (kijelzo) {
-        kijelzo.innerHTML = "Max pont: " + maxPont;
+        kijelzo.innerHTML = "Még elérhető: " + maxPont;
+        
+        // Ha kevesebb, mint 300, legyen PIROS a keret és a szöveg
         if (maxPont < 300) {
             kijelzo.style.borderColor = "red";
-            kijelzo.style.color = "#ff8888";
-            kijelzo.innerHTML += "<br>(Nincs meg a 300!)";
+            kijelzo.style.color = "#ff6666";
+            kijelzo.innerHTML += "<br><span style='font-size:16px'>(Nincs meg a 300!)</span>";
             jatekVege = true;
         } else {
-            kijelzo.style.borderColor = "gold";
+            // Ha még jó, legyen ARANY/ZÖLD
+            kijelzo.style.borderColor = "#ffd700";
             kijelzo.style.color = "white";
             jatekVege = false;
         }

@@ -1,17 +1,26 @@
-const RA_CARTA = 1.39 // Relação de aspeto da carta (64:89)
+const RA_CARTA = 1.39 
 const CORES = [
-    [35, 85, 172], // Kék
-    [163, 12, 19], // Piros
-    [225, 182, 21] // Sárga
+    [35, 85, 172], // Kék (RGB)
+    [163, 12, 19], // Piros (RGB)
+    [225, 182, 21] // Sárga (RGB)
 ]
+
+// CSS színek a szöveges kiíráshoz (hogy jól látsszon a fekete háttéren)
+const CSS_SZINEK = [
+    "#4da6ff", // Világos kék
+    "#ff4d4d", // Világos piros
+    "#ffd700"  // Arany sárga
+];
+
+const SZIN_NEVEK = ["Kék", "Piros", "Sárga"];
 
 let historico = {
     pos: -1,
     dados: []
 }
 
-let cartas_descartadas = []       // Cartas que já foram utilizadas
-let jatekVege = false; // ÚJ VÁLTOZÓ: Jelzi, ha matematikailag vége
+let cartas_descartadas = []       
+let jatekVege = false; 
 
 function iniciarJogo() {
     for (let cor = 0; cor < 3; cor++) {
@@ -20,13 +29,12 @@ function iniciarJogo() {
         cartas_descartadas[cor].push(false)
     }
     
-    jatekVege = false; // Új játék indulásakor reset
+    jatekVege = false; 
     adicionarAoHistorico()
-    ellenorizdAPontokat(); // Első ellenőrzés
+    ellenorizdAPontokat(); 
 }
 
 function setup() {
-    // Add snow
     let d = new Date()
     if (d.getMonth() > 10 || d.getMonth() < 2) {
         let head = document.querySelector('head')
@@ -37,12 +45,15 @@ function setup() {
     }
 
     iniciarJogo()
-    // Inicializar a framework Vue.js
+    
+    // Létrehozzuk a két kijelzőt
+    kijelzoLetrehozasa();   // Jobb oldal (Pontok)
+    tablazatLetrehozasa();  // Bal oldal (Kombinációk)
+
     window.app = new Vue({
         el: '#app',
         data: {
-            a: 0,
-            pontszamInfo: "Hajrá!" // ÚJ: Kiírhatjuk ide az infót
+            a: 0
         },
         methods: {
             combinacaoDisponivel(a, b, c, d=-1) {
@@ -52,38 +63,29 @@ function setup() {
         }
     })
 
-    // Criar uma tela para desenhar o jogo
     let canvas = createCanvas(750, ((750/8) * RA_CARTA) * 3 +1)
     canvas.parent('game')
 }
 
 function draw() {
-    // Limpar canvas
     clear()
-    //background(16, 16, 21)
-
-    // Desenhar todas as cartas para selecionar
+    
     let LARGURA_CARTA = width/8
     let ALTURA_CARTA = LARGURA_CARTA * RA_CARTA
     for (let cor = 0; cor < 3; cor++) {
 
         for (let carta = 1; carta <= 8; carta++) {
-            // Calcular posição onde a carta deve ser desenhada
             let x, y
-            
             x = LARGURA_CARTA * (carta-1)
             y = ALTURA_CARTA * cor;
         
             fill(CORES[cor])
-
-            // Verificar se a carta ja foi utilizada
-            if (cartas_descartadas[cor][carta-1]) fill(70)
+            if (cartas_descartadas[cor][carta-1]) fill(70) 
 
             stroke(0)
             strokeWeight(1)
             rect(x, y, LARGURA_CARTA, ALTURA_CARTA)
 
-            // Desenhar valor da carta
             let centro = {
                 x: x + (LARGURA_CARTA / 2),
                 y: y + (ALTURA_CARTA / 2)
@@ -96,11 +98,8 @@ function draw() {
             strokeWeight(3)
             text(carta, centro.x, centro.y)
 
-            // --- ÚJ RÉSZ: X RAJZOLÁSA ---
-            // Ha a játék véget ért (nincs meg a 300), és a kártya még nincs kiválasztva (nem szürke),
-            // akkor húzzuk át pirossal, jelezve, hogy felesleges.
             if (jatekVege && !cartas_descartadas[cor][carta-1]) {
-                stroke(255, 0, 0); // Piros szín
+                stroke(255, 0, 0); 
                 strokeWeight(5);
                 line(x, y, x + LARGURA_CARTA, y + ALTURA_CARTA);
                 line(x + LARGURA_CARTA, y, x, y + ALTURA_CARTA);
@@ -111,35 +110,27 @@ function draw() {
 
 
 function mousePressed() {
-    // Ha vége a lehetőségnek, ne engedjen kattintani (kivéve ha undo gombra kattintunk, de az HTML-ben van)
-    // if (jatekVege) return; // Ezt kiveheted, ha azt akarod, hogy kattinthassanak még, csak lássák az X-et.
-
-    // Verificar se o utilizador carregou fora do canvas
     if (mouseX < 0 || mouseX > width || mouseY < 0 || mouseY > height)
         return
 
     let LARGURA_CARTA = width / 8
     let ALTURA_CARTA = LARGURA_CARTA * RA_CARTA
 
-    // Verificar se o utilizador escolheu uma carta
     if (mouseY < ALTURA_CARTA * 3) {
-        // Obter carta escolhida pelo utilizador
         let cor = ~~(mouseY / (height/3)) 
         
         let x = floor(mouseX / LARGURA_CARTA)
         let carta = x % 8 + 1
 
-        // Csak akkor engedjük, ha még nincs kiválasztva
         if (!cartas_descartadas[cor][carta-1]) {
              cartas_descartadas[cor][carta-1] = true
              adicionarAoHistorico()
              app.a++
-             ellenorizdAPontokat() // Minden kattintás után újraszámolunk!
+             ellenorizdAPontokat() 
         }
     }
 }
 
-/* Funções relativas ao historico */
 function limpar() {
     historico.pos = 1
     desfazer()
@@ -164,7 +155,7 @@ function carregarDoHistorico(pos) {
 
     cartas_descartadas = dados.cartas_descartadas
     app.a++
-    ellenorizdAPontokat() // Undo/Redo után is ellenőrizni kell
+    ellenorizdAPontokat() 
 }
 
 function adicionarAoHistorico() {
@@ -190,69 +181,90 @@ function cartaDisponivel(carta, cor) {
 
 
 function combinacaoDisponivel(a, b, c, cor=-1) {
-    // Ordenar cartas pelos valores
     let ord = [a, b, c].sort()
     a = ord[0]
     b = ord[1]
     c = ord[2]
 
-    // Verificar se a combinação são de cartas com o mesmo valor (Szettek)
     if (a == b && b == c) {
         return cartaDisponivel(a, 0) && cartaDisponivel(a, 1) && cartaDisponivel(a, 2)
     }
 
-    // Verificar se é uma sequencia (Sorok)
     if (a + 1 == b && b + 1 == c) {
-        // Verificar se a sequencia pode ser de qualquer cor (Vegyes szín)
         if (cor == -1) {
             return (cartaDisponivel(a, 0) || cartaDisponivel(a, 1) || cartaDisponivel(a, 2)) 
                 && (cartaDisponivel(b, 0) || cartaDisponivel(b, 1) || cartaDisponivel(b, 2))
                 && (cartaDisponivel(c, 0) || cartaDisponivel(c, 1) || cartaDisponivel(c, 2))
         }
-
-        // Azonos szín
         return cartaDisponivel(a, cor) && cartaDisponivel(b, cor) && cartaDisponivel(c, cor)
     }
     return false;
 }
 
+// --- JOBB OLDALI KIJELZŐ (PONTOK) ---
+function kijelzoLetrehozasa() {
+    let div = document.createElement("div");
+    div.id = "pont-kijelzo";
+    div.style.position = "fixed";
+    div.style.top = "20px";
+    div.style.right = "20px";
+    div.style.backgroundColor = "rgba(0, 0, 0, 0.85)";
+    div.style.color = "white";
+    div.style.padding = "15px 25px";
+    div.style.borderRadius = "12px";
+    div.style.fontFamily = "Arial, sans-serif";
+    div.style.fontSize = "22px";
+    div.style.fontWeight = "bold";
+    div.style.border = "3px solid #ffd700";
+    div.style.boxShadow = "0 4px 8px rgba(0,0,0,0.5)";
+    div.style.zIndex = "9999";
+    div.innerHTML = "Számolás...";
+    document.body.appendChild(div);
+}
 
-// --- ÚJ FÜGGVÉNY: EZ SZÁMOLJA KI A MATEMATIKÁT ---
+// --- ÚJ: BAL OLDALI TÁBLÁZAT (KOMBINÁCIÓK) ---
+function tablazatLetrehozasa() {
+    let div = document.createElement("div");
+    div.id = "kombinacio-tablazat";
+    div.style.position = "fixed";
+    div.style.top = "20px";
+    div.style.left = "20px"; // Bal oldal
+    div.style.backgroundColor = "rgba(0, 0, 0, 0.9)";
+    div.style.color = "white";
+    div.style.padding = "15px";
+    div.style.borderRadius = "12px";
+    div.style.fontFamily = "Consolas, monospace"; // Hogy szépen igazodjon
+    div.style.fontSize = "16px";
+    div.style.border = "2px solid #555";
+    div.style.boxShadow = "0 4px 8px rgba(0,0,0,0.5)";
+    div.style.zIndex = "9999";
+    div.style.maxWidth = "350px";
+    div.innerHTML = "Betöltés...";
+    document.body.appendChild(div);
+}
+
+// --- FŐ LOGIKA: PONTOK ÉS TÁBLÁZAT FRISSÍTÉSE ---
 function ellenorizdAPontokat() {
     let maxPont = 0;
+    
+    // HTML tartalom előkészítése a bal oldali táblázathoz
+    let tablazatHTML = "<h3 style='margin:0 0 10px 0; text-align:center;'>Még kirakható sorok:</h3>";
 
-    // 1. SZETTEK (Egyforma számok: 1-1-1 ... 8-8-8)
-    // Pontok: 20, 30, 40, 50, 60, 70, 80, 90
+    // 1. SZETTEK (Ezt nem írjuk ki a táblázatba, csak a pontot számoljuk, hogy ne legyen zsúfolt)
     for (let i = 1; i <= 8; i++) {
         if (combinacaoDisponivel(i, i, i)) {
-            maxPont += (i * 10) + 10; // Pl: 1-esek: 20 pont, 2-esek: 30 pont
+            maxPont += (i * 10) + 10; 
         }
     }
 
-    // 2. VEGYES SZÍNŰ SOROK (1-2-3 ... 6-7-8)
-    // Pontok: 10, 20, 30, 40, 50, 60
+    // 2. VEGYES SZÍNŰ SOROK (Szintén csak pont)
     for (let i = 1; i <= 6; i++) {
-        if (combinacaoDisponivel(i, i+1, i+2)) { // cor=-1 alapértelmezett
-            maxPont += (i * 10); // Pl: 1-2-3: 10 pont
+        if (combinacaoDisponivel(i, i+1, i+2)) { 
+            maxPont += (i * 10); 
         }
     }
 
-    // 3. AZONOS SZÍNŰ SOROK (Kék 1-2-3, Piros 1-2-3...)
-    // Pontok: 50, 60, 70, 80, 90, 100
-    for (let c = 0; c < 3; c++) { // 3 szín
-        for (let i = 1; i <= 6; i++) { // 1-től 6-ig kezdődhet a sor
-            if (combinacaoDisponivel(i, i+1, i+2, c)) {
-                maxPont += (i * 10) + 40; // Pl: 1-2-3: 50 pont, 2-3-4: 60 pont
-            }
-        }
-    }
-
-    console.log("Jelenleg elérhető max pontszám:", maxPont);
-
-    // HA KEVESEBB MINT 300, akkor GAME OVER
-    if (maxPont < 300) {
-        jatekVege = true;
-    } else {
-        jatekVege = false;
-    }
-}
+    // 3. AZONOS SZÍNŰ SOROK (Ezeket listázzuk ki!)
+    for (let c = 0; c < 3; c++) { 
+        // Szín fejléc (pl. Kék:)
+        tablazatHTML += `<div style='margin-bottom:5
